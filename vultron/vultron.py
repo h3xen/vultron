@@ -1391,10 +1391,13 @@ def run_diary_auth() -> tuple[list | None, list | None, list | None]:
                 )
                 time.sleep(1.5)  # Pozostawione celowo na animację przejścia z loginu do hasła
 
-                # Wpisanie hasła
-                wait.until(EC.presence_of_element_located((By.ID, "Password"))).send_keys(
+                # Wpisanie hasła. Pole "Password" bywa w DOM od razu, ale ukryte do
+                # czasu przejścia z kroku loginu - czekamy, aż będzie widoczne i aktywne.
+                wait.until(EC.element_to_be_clickable((By.ID, "Password"))).send_keys(
                     CONFIG.get("password", "") + Keys.ENTER
                 )
+
+
 
             # Oczekiwanie na kafelki Dziennika.
             #
