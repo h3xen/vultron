@@ -18,7 +18,7 @@ jobs:
       - name: Install & Lint
         run: |
           if [ -f package.json ]; then
-            npm ci || npm install  # ci fail → install
+            npm ci
             npx eslint .
           fi
 
