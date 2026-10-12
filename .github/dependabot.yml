@@ -5,21 +5,37 @@ updates:
     directory: "/vultron" # Ścieżka do folderu, gdzie jest Dockerfile
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
 
   # 2. AKTUALIZACJA PYTHONA (Zadziała tylko, gdy stworzysz plik requirements.txt)
   - package-ecosystem: "pip"
     directory: "/vultron"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
 
   # 3. AKTUALIZACJA GITHUB ACTIONS (Skanery bezpieczeństwa itp.)
   - package-ecosystem: "github-actions"
     directory: "/" # Workflowy zawsze są w /.github/ wiec tu zostaje "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
 
   # 4. AKTUALIZACJA NPM (ESLint i wtyczka bezpieczeństwa używane w CI)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  # 5. AKTUALIZACJA NARZĘDZI PYTHON W CI (semgrep, bandit, ruff - pliki .in/.txt z hashami)
+  - package-ecosystem: "pip"
+    directory: "/.github/requirements"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7

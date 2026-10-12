@@ -33,6 +33,6 @@ jobs:
           python-version: '3.12'
       - name: Semgrep scan
         run: |
-          pip install semgrep==1.180.0
+          pip install --require-hashes -r .github/requirements/semgrep.txt
           semgrep scan --config auto
         continue-on-error: true  # Nie blokuje workflow na findings
