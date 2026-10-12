@@ -47,7 +47,8 @@
 # Vultron (Jungfru)
 
 GPE Gdansk accounts can use the optional `gdansk` provider. See the
-[GPE setup, supported data and limitations](GDANSK.md). The default remains eduVULCAN.
+GPE setup, supported data and limitations: [PL](GDANSK.pl.md) | [EN](GDANSK.md).
+The default remains eduVULCAN.
 
 **Vultron** to **totalnieNIEzaawansowana** integracja Home Assistant z systemem dziennika elektronicznego **EduVulcan.pl**. Dodatek został zaprojektowany, aby dostarczać rodzicom i uczniom kluczowe informacje o edukacji w sposób przejrzysty, zautomatyzowany i bezpieczny.
 
@@ -80,7 +81,11 @@ GPE Gdansk accounts can use the optional `gdansk` provider. See the
 **Przy pierwszym uruchomieniu ZALECANE śledzenie zakładki LOGI**
 czy proces logowania przechodzi poprawnie.
 
-**W razie błędów skrypt SAMOCZYNNIE zabije kontener.**
+**Dodatek sam się zatrzymuje w dwóch sytuacjach:**
+- **eduVULCAN dwa razy z rzędu odrzuci logowanie** (złe hasło albo weryfikacja). Dodatek przestaje wtedy próbować, żeby nie zablokować konta, i kończy pracę. **Docker:** `restart: unless-stopped` uruchomi kontener ponownie, a licznik odrzuceń zeruje się przy starcie, więc przy złym haśle dodatek zrobi kolejne dwie próby. Zatrzymaj wtedy kontener (`docker compose stop`) i popraw dane. **Dodatek HA:** zostaje zatrzymany do ręcznego uruchomienia.
+- **Przeglądarka (Chromium) się zawiesi.** Proces kończy się wtedy twardo. W Dockerze kontener wstaje sam, w dodatku HA trzeba go uruchomić ręcznie.
+
+Zwykłe, chwilowe błędy portalu (np. przerwa techniczna, błąd 502) nie zatrzymują dodatku. Kolejna próba nastąpi po wydłużonej przerwie.
 
 **Przed ponownym startem:**
 Sprawdź ręcznie logowanie w oryginalnym dzienniku przez W W W.
@@ -104,8 +109,10 @@ Sprawdź ręcznie logowanie w oryginalnym dzienniku przez W W W.
 - 📊 **Monitoring:** Dedykowana encja `binary_sensor.vultron_rozmiar_alert` ostrzega, gdy atrybuty którejkolwiek encji zbliżają się do twardego limitu Home Assistant (16 384 B) — pozwala wykryć problem, zanim HA zacznie po cichu odrzucać dane.
 - 🛠️ **Zero-Click UI:** Dodatek automatycznie rejestruje wymagane karty JavaScript w zasobach Lovelace (Resources) przy każdym starcie.
 - 🕵️ **System Anty-Detekcyjny:**
-  - Zapytania do serwerów Vulcan wysyłane są w losowych odstępach (40-60 min).
+  - Zapytania do serwerów Vulcan wysyłane są w losowych odstępach (40-60 min) w dni robocze.
+  - **Weekendy:** pobieranie tylko o stałych porach (sobota 8:00, 16:00, 23:00; niedziela 8:00, 12:00, 20:00).
   - **Tryb Nocny:** Całkowite wstrzymanie aktywności między 01:00 a 05:59.
+  - Po kolejnych nieudanych logowaniach przerwa wydłuża się o 10 min za każde (maks. +60 min).
 - 📝 **Precyzyjne Logowanie:** Wszystkie zdarzenia logowane są z timestampem w formacie `[YYYY-MM-DD HH:MM:SS]`.
 
 
@@ -116,6 +123,8 @@ System opiera się na modularnej strukturze współpracujących funkcji:
 | Moduł | Role | Opis techniczny |
 | :--- | :--- | :--- |
 | `vultron.py` | 🔑 Logowanie <br>📝 Oceny <br>💬 Uwagi <br>✉️ Wiadomości <br>📅 Plan lekcji <br>🎒 Zadania <br>✔️ Frekwencja <br>🏆 Osiągnięcia <br>📊 Monitoring <br>🎨 UI Setup <br>⚙️ Orkiestrator <br> 👩‍🏫 Zebrania <br>🧸 Przedszkole <br>| Główny silnik aplikacji. Obsługuje logowanie **Selenium Headless** (Panel Rodzica + Panel Wiadomości), ekstrakcję kluczy sesji (`key`), pobieranie ocen, uwag, wiadomości, planu lekcji, zadań, frekwencji i osiągnięć. Automatycznie rozpoznaje konta przedszkolne i przetwarza je osobną ścieżką (plan zajęć, ewidencja obecności, jadłospis, zebrania, opłaty, informacje o placówce, nauczyciele). Zarządza bazą **SQLite** (`vultron.db`), monitoringiem zasobów, automatyczną rejestracją kart w Home Assistant oraz pętlą czasową z mechanizmem anty-detekcji. |
+| `gdansk.py` | 🏫 **GPE Gdańsk** | Opcjonalny dostawca danych GPE/UONET+ (wybierany opcją `provider`). Ma własne logowanie i API, osobne od eduVULCAN. Opis: [PL](GDANSK.pl.md) / [EN](GDANSK.md). |
+| `translations/pl.yaml` | 🌐 **Interfejs** | Polskie nazwy i opisy opcji w zakładce Konfiguracja dodatku. |
 | `vultron-card.js` | 🎨 **Stylizacja** | Karta Lovelace — plan lekcji. |
 | `vultron-grades-card.js` | 🎨 **Stylizacja** | Karta Lovelace — oceny (widoki: PRZEDMIOTY, NAJNOWSZE, KOŃCOWE). |
 | `vultron-messages-card.js` | 🎨 **Stylizacja** | Karta Lovelace — wiadomości. |
@@ -306,12 +315,12 @@ nano data/options.json
 Wklej dokładnie to (i podmień dwa miejsca — swój login i swoje hasło):
 
 ```json
-{"username": "TUTAJ_TWOJ_LOGIN", "password": "TUTAJ_TWOJE_HASLO", "log_level": "info", "test_mode": false}
+{"provider": "eduvulcan", "username": "TUTAJ_TWOJ_LOGIN", "password": "TUTAJ_TWOJE_HASLO", "log_level": "info", "test_mode": false}
 ```
 
 Przykład jak to powinno wyglądać po wypełnieniu:
 ```json
-{"username": "jan.kowalski", "password": "MojeHaslo123", "log_level": "info", "test_mode": false}
+{"provider": "eduvulcan", "username": "rodzic@email.pl", "password": "MojeHaslo123", "log_level": "info", "test_mode": false}
 ```
 
 Zapisz: `Ctrl+O`, `Enter`, `Ctrl+X`.
@@ -354,11 +363,13 @@ folder.
 
 ## Krok 8: Sprawdź jedną rzecz w ustawieniach Home Assistant
 
-1. Wejdź w Home Assistant do **Ustawienia → Panel sterowania**.
-2. Sprawdź, czy widzisz opcję edycji przez przyciski/myszkę (nie same pliki
-   tekstowe). Jeśli tak — wszystko gra, idź dalej.
-3. Jeśli nie masz pewności — po prostu przejdź dalej, sprawdzimy to na
-   końcu.
+Vultron sam dodaje swoje karty do ustawień Home Assistant, ale tylko wtedy,
+gdy token z Kroku 1 należy do konta **administratora**.
+
+1. Wejdź w Home Assistant do **Ustawienia → Osoby → Twoje konto**.
+2. Sprawdź, czy jest włączona opcja **Administrator**. Jeśli tak — wszystko
+   gra, idź dalej.
+3. Jeśli nie — token trzeba utworzyć na koncie administratora (Krok 1).
 
 ---
 
@@ -497,6 +508,16 @@ linijka w `volumes:` w pliku `compose.yaml` (Krok 9) kończy się literką
    którą chcesz widzieć (typ: **JavaScript Module**, adres:
    `/local/vultron/nazwa-karty.js`).
 
+### Wpisałem złe hasło - co robi Vultron?
+
+Po dwóch odrzuconych logowaniach Vultron przestaje próbować i kończy pracę
+(`sensor.vultron_status` ma stan `authentication_error`). Docker
+`restart: unless-stopped` uruchomi go jednak ponownie, a licznik odrzuceń
+zeruje się przy starcie, więc przy złym haśle dwie próby powtórzą się po
+każdym restarcie. Dlatego od razu: `docker compose stop`, popraw hasło w
+`data/options.json`, zaloguj się ręcznie na eduvulcan.pl, potem
+`docker compose up -d`.
+
 ### Vultron ciągle się restartuje / wyłącza
 
 Wpisz:
@@ -533,6 +554,8 @@ W zakładce **Konfiguracja** zainstalowanego dodatku wypełnij dane dostępowe:
 
 | Parametr | Opis | Przykład |
 | :--- | :--- | :--- |
+| `Portal dziennika` (`provider`) | `eduvulcan` (domyślnie) albo `gdansk` (GPE/UONET+, patrz [PL](GDANSK.pl.md) / [EN](GDANSK.md)). | `eduvulcan` |
+| `Imię i nazwisko ucznia` (`student_name`) | Tylko dla GPE: dokładne imię i nazwisko. Puste pobiera wszystkich uczniów. Dla eduVULCAN jest ignorowane. | |
 | `username` | Adres e-mail do EduVulcan | `rodzic@email.pl` |
 | `password` | Hasło do portalu | `TwojeTajneHasło` |
 | `Poziom logowania` | Określa szczegółowość logów w zakładce Logi. Domyślnie: info. | `info`,`debug`,`trace` (nie rozumiesz, nie zmieniaj)|
@@ -541,7 +564,9 @@ W zakładce **Konfiguracja** zainstalowanego dodatku wypełnij dane dostępowe:
 1. Kliknij **Zapisz**.
 2. Kliknij **Uruchom**.
 
-**Ważne:** Przy pierwszym uruchomieniu zalecane jest śledzenie zakładki **Logi**, aby upewnić się, że proces logowania przebiega pomyślnie. Skrypt posiada zabezpieczenie: jeśli eduVULCAN dwa razy odrzuci logowanie (złe hasło lub weryfikacja) bez udanego logowania pomiędzy, dodatek się zatrzymuje, chroniąc Twoje konto przed blokadą. Stan synchronizacji i ostatni błąd pokazuje encja `sensor.vultron_status` (`ok` / `error` / `authentication_error`). Chwilowe awarie portalu (przerwa techniczna, błąd serwera) nie zatrzymują dodatku - kolejna próba nastąpi z wydłużoną przerwą.
+**Ważne:** Przy pierwszym uruchomieniu zalecane jest śledzenie zakładki **Logi**, aby upewnić się, że proces logowania przebiega pomyślnie. Skrypt posiada zabezpieczenie: jeśli eduVULCAN dwa razy odrzuci logowanie (złe hasło lub weryfikacja) bez udanego logowania pomiędzy, dodatek się zatrzymuje, chroniąc Twoje konto przed blokadą. `sensor.vultron_status` ma wtedy stan `authentication_error`. W Dockerze kontener po restarcie spróbuje zalogować się jeszcze raz (patrz „Achtung” wyżej), więc przy złym haśle zatrzymaj go ręcznie. Stan synchronizacji i ostatni błąd pokazuje encja `sensor.vultron_status` (`ok` / `error` / `authentication_error`). Chwilowe awarie portalu (przerwa techniczna, błąd serwera) nie zatrzymują dodatku - kolejna próba nastąpi z wydłużoną przerwą.
+
+> ℹ️ Opcja `calendar_entity` (nazwa kalendarza z własnymi zajęciami, domyślnie `calendar.local_szkola`) działa tylko w instalacji Docker: dopisz ją do `data/options.json`. W dodatku HA nie ma jej w interfejsie, więc używana jest domyślna nazwa.
 
 ---
 
@@ -758,7 +783,7 @@ mozna też użyć
 
 Jeśli lista w encji (uwagi, zebrania, terminarz, osiągnięcia) nie mieści się w limicie Home Assistanta, najstarsze wpisy są pomijane, a atrybut `pominiete` mówi ile. Stan encji nadal pokazuje pełną liczbę wpisów.
 
-Oblicza sumaryczny rozmiar atrybutów wszystkich encji sensor.vultron_* w Home Assistant (w bajtach). Tworzy szczegółowy raport z rozmiarem każdej encji. Generuje listę ostrzeżeń dla encji przekraczających próg ostrzegawczy (14 000 B). Cel: wczesne wykrycie dużych encji, które mogą spowolnić HA lub przekroczyć limity ~16 kB. Sensory tworzone automatycznie i automatycznie aktualizowane.
+`sensor.vultron_system_monitor` pokazuje w stanie sumaryczny rozmiar atrybutów wszystkich encji `sensor.vultron_*` (w bajtach), a w atrybucie `szczegoly` rozmiar każdej z nich osobno. `binary_sensor.vultron_rozmiar_alert` ma stan `on`, gdy którakolwiek encja przekroczy **15 500 B** (twardy limit Home Assistant to 16 384 B). Cel: wykryć duże encje, zanim HA zacznie odrzucać ich atrybuty. Obie encje tworzą się i odświeżają automatycznie po każdym cyklu.
 
 ```yaml
 sensor.vultron_system_monitor
@@ -945,7 +970,18 @@ actions:
 
 ## ⚠️ Debugowanie
 Jeśli napotkasz problemy z logowaniem:
-1. Sprawdź zakładkę **Logi** dodatku. Wszystkie błędy są tam opisywane w czasie rzeczywistym.
+1. Sprawdź zakładkę **Logi** dodatku (Docker: `docker compose logs -f`). Wszystkie błędy są tam opisywane w czasie rzeczywistym.
+2. Sprawdź `sensor.vultron_status`: atrybut `error` mówi, co poszło nie tak, a `last_success` kiedy ostatnio się udało.
+3. Gdy logowanie się nie powiedzie, dodatek zapisuje zrzut ekranu strony logowania: `/config/www/vultron/vultron_auth_error.png` (w przeglądarce: `/local/vultron/vultron_auth_error.png`). Zawiera tylko stronę logowania, ale przed wysłaniem zgłoszenia sprawdź, czy nie widać na nim niczego prywatnego.
+4. Przy `authentication_error` patrz „Wpisałem złe hasło” w sekcji Docker.
+
+### 🧸 Usuwanie błędnej wiadomości przedszkolaka (po aktualizacji do 7.1.6)
+Jeśli przed 7.1.6 do wiadomości przedszkolaka trafiła wiadomość ucznia szkoły, nadal siedzi w bazie. Znajdź ją i usuń (Docker: `docker exec vultron ...`; dodatek HA: nazwę kontenera pokaże `docker ps | grep vultron`):
+```bash
+docker exec vultron sqlite3 /data/vultron.db "SELECT key, student_slug, data, nadawca, temat FROM przedszkole_wiadomosci;"
+docker exec vultron sqlite3 /data/vultron.db "DELETE FROM przedszkole_wiadomosci WHERE key='TUTAJ_KLUCZ';"
+```
+Przed usuwaniem zrób kopię `/data/vultron.db`. Encja odświeży się przy następnym cyklu.
 
 ## 🪲 Zgłaszanie błędów i Bezpieczeństwo
 
@@ -966,6 +1002,8 @@ Jeśli zdecydujesz się usunąć dodatek:
 1. Odinstaluj Vultron w zakładce Dodatki.
 2. Ręcznie usuń folder `/config/www/vultron`.
 3. Usuń wpisy kart (filtr po vultron_) w `Ustawienia → Pulpity sterujące → Zasoby`
+
+**Docker:** `docker compose down`, usuń foldery `data/` i `secrets/` (zawierają hasło i token), folder `www/vultron` oraz **usuń token** w Home Assistant (Profil → Bezpieczeństwo → Długoterminowe tokeny dostępu).
 
 ## ⚖️ Nota prawna
 > [!IMPORTANT]
