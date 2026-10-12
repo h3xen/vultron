@@ -29,7 +29,7 @@ Im więcej konkretów, tym szybciej naprawa. „Nie działa” to też opis, ale
 Vultron dotyka danych Twoich dzieci i Twojego konta. Zanim cokolwiek wkleisz publicznie:
 
 - **Nigdy** nie wklejaj loginu, hasła, cookies, tokenów, nagłówków `Authorization`.
-- **Nigdy** nie dołączaj plików `vultron.db`, `vul.pkl`, `bul.pkl` ani zawartości `/data`.
+- **Nigdy** nie dołączaj plików `vultron.db`, `vul.pkl` ani zawartości `/data`.
 - Zamaż imiona, nazwiska, oceny, uwagi i treść wiadomości w logach i na zrzutach ekranu.
 - Znalazłeś lukę bezpieczeństwa? **Nie** zakładaj issue. Zgłoś ją prywatnie, opis jest w [SECURITY.md](SECURITY.md).
 

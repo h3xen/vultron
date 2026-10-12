@@ -17,3 +17,9 @@ updates:
     directory: "/" # Workflowy zawsze są w /.github/ wiec tu zostaje "/"
     schedule:
       interval: "weekly"
+
+  # 4. AKTUALIZACJA NPM (ESLint i wtyczka bezpieczeństwa używane w CI)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"

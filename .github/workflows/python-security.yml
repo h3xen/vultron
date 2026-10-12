@@ -19,7 +19,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install tools
-        run: pip install bandit ruff
+        run: pip install bandit==1.9.4 ruff==0.17.0
 
       - name: Run Bandit (Security Linter)
         # Dodaliśmy --skip B301, aby zignorować ostrzeżenia o pickle

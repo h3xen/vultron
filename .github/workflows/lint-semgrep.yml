@@ -33,6 +33,6 @@ jobs:
           python-version: '3.12'
       - name: Semgrep scan
         run: |
-          pip install semgrep
+          pip install semgrep==1.180.0
           semgrep scan --config auto
         continue-on-error: true  # Nie blokuje workflow na findings

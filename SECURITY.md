@@ -20,7 +20,7 @@ dostęp do danych innego użytkownika, wykonanie kodu w kontenerze.
 ## O Twoich danych
 
 Vultron przechowuje dane logowania i sesję **lokalnie** w Twojej instancji Home Assistant.
-Nikomu nie udostępniaj plików `vultron.db`, `vul.pkl` ani `bul.pkl`, a w logach dołączanych do zgłoszeń
+Nikomu nie udostępniaj plików `vultron.db` (z towarzyszącymi `-wal` i `-shm`) ani `vul.pkl` (mimo rozszerzenia to plik JSON z zapisaną sesją), a w logach dołączanych do zgłoszeń
 zamazuj hasła, cookies, tokeny i dane dzieci.
 
 ## Jak dbamy o bezpieczeństwo
