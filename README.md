@@ -56,7 +56,7 @@ GPE Gdansk accounts can use the optional `gdansk` provider. See the
 - [@KamillJot](https://github.com/KamillJot) — wsparcie dla [GPE Gdańsk](GDANSK.md)
 
 ##
- **Wersja:** 7.1.4 \
+ **Wersja:** 7.1.5 \
 **Nazwa Kodowa:** Jungfru ♍
 
 # 📖 Spis treści
