@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/htomasz/vultron#readme",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "eslint": "^10.0.2",
     "eslint-plugin-security": "^4.0.0"
   }

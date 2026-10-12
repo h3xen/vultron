@@ -19,7 +19,7 @@ jobs:
         run: |
           if [ -f package.json ]; then
             npm ci || npm install  # ci fail → install
-            npx eslint . --ext .js,.ts || echo "ESLint OK or skipped"
+            npx eslint .
           fi
 
   semgrep:
