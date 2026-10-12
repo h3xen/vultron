@@ -1,4 +1,27 @@
 ## 🧩 Changelog
+### **7.1.6 - Jungfru**
+- **Naprawa: wiadomość ucznia szkoły pojawiała się też w wiadomościach przedszkolaka** — przy jednym koncie rodzica z uczniem szkoły i przedszkolakiem Vultron pobierał wiadomości przedszkolaka bez wskazania skrzynki, więc dostawał skrzynkę ucznia. Teraz pyta o skrzynkę przedszkolaka jawnie (tak jak dla uczniów szkół). **Uwaga:** wiadomość, która już trafiła do przedszkolaka, zostaje w bazie — usuń ją ręcznie (opis w README/FAQ lub zapytaj w zgłoszeniu).
+- **Naprawa: logowanie kończyło się błędem „element not interactable"** — eduVULCAN ma teraz pole hasła w kodzie strony od razu, ale ukryte do czasu kliknięcia „Dalej”, a Vultron wpisywał hasło, gdy tylko pole istniało. Teraz czeka, aż pole będzie widoczne. Jeśli mimo to się nie pojawi, zapisuje zrzut ekranu (`/local/vultron/vultron_auth_error.png`).
+- **Naprawa: oceny z procentem w nawiasie** — ocena typu `1 (23%)` liczy się teraz jako 1 i ma kolor oceny (wcześniej była pomijana w średniej i niebieska jak ocena procentowa).
+- **Naprawa: opis oceny „None"** — gdy kolumna w dzienniku nie miała kategorii, dymek pokazywał „None". **Uwaga:** jeśli używasz automatyzacji „nowa ocena", po aktualizacji możesz dostać jednorazowe powiadomienie o takich ocenach (zmienił się ich opis).
+- **Bezpieczeństwo: logowanie**
+    - Dodatek zatrzymuje się, gdy eduVULCAN **dwa razy odrzuci logowanie** (złe hasło albo weryfikacja) bez udanego logowania pomiędzy — wcześniej próbował w kółko, co groziło blokadą konta.
+    - Chwilowe awarie portalu (przerwa techniczna, błąd 502) **nie wyłączają już dodatku na stałe** — wcześniej każda taka odpowiedź była brana za CAPTCHA. Teraz kolejna próba nastąpi z wydłużoną przerwą.
+    - Nowa encja `sensor.vultron_status` (`ok` / `error` / `authentication_error`) z ostatnim błędem i czasem ostatniej udanej synchronizacji — jak `sensor.vultron_gdansk_status`.
+    - Poprawiona literówka w adresie logowania (`ReturnUrl`) + zapasowe przejście na stronę dostępu do dziennika, gdy kafelki się nie pokażą.
+- **Bezpieczeństwo: sesja**
+    - Ciasteczka sesji eduVULCAN są wysyłane **wyłącznie do domeny dziennika** — wcześniej poszłyby do dowolnej strony, na którą przekierowałby serwer.
+    - Adres dziennika po zalogowaniu jest ściśle sprawdzany (tylko https, bez portów i podejrzanych adresów).
+    - Karty uwag, zadań i ocen escapują wszystkie dane z dziennika (zostały pominięte daty) + nowy test (`tests/test_cards_xss.cjs`), który to pilnuje.
+- **Plan przedszkola: kreska aktualnej godziny** — żółta kreska z godziną w kolumnie dzisiejszej oddziela zajęcia rozpoczęte od przyszłych. Karta odświeża się też po przełączeniu widoku (wcześniej „TERAZ" zamierało do przeładowania strony).
+- **Naprawa: usunięte w dzienniku wpisy znikają** — odwołany sprawdzian, usunięta uwaga, odwołane zebranie czy dzień wolny zostawały w Vultronie na zawsze. Starsze wpisy spoza okresu, który zwraca dziennik (np. z poprzedniego roku), zostają jak dotąd.
+- **Naprawa: za duże encje** — przy bardzo wielu uwagach, zebraniach czy osiągnięciach Home Assistant po cichu odrzucał całą encję (pusta karta). Teraz pomijane są najstarsze wpisy, a atrybut `pominiete` mówi ile.
+- **Stabilność**
+    - Błąd jednej wiadomości (sieć, uszkodzona odpowiedź) nie przerywa już synchronizacji wiadomości wszystkich dzieci.
+    - Błąd jednego zapytania frekwencji nie przerywa całej sekcji frekwencji i statystyk.
+    - Rejestracja kart nie blokuje już równoległego pobierania danych.
+- **Dokumentacja (README)** — opis `sensor.vultron_status`, jak wyłączyć zapis historii wiadomości, uwag i ocen dzieci w bazie HA (`recorder`), oraz uwaga o bezpieczeństwie tokena w trybie samodzielnego kontenera.
+
 ### **7.1.4 - Jungfru**
 - **Naprawa: poprawione oceny psuły średnią** [#59](https://github.com/htomasz/vultron/discussions/59) — po poprawie (np. 2 → 5-) obie oceny liczyły się do średniej. Teraz liczy się tylko poprawa, a stara ocena jest pokazana w nawiasie: `5- (2)`.
 - **Zmiana: średnia taka sama jak w dzienniku** — jeśli szkoła ma włączone średnie, Vultron pokazuje dokładnie tę z eduVULCAN (z wagami i zasadami szkoły). Uwaga: przez to średnie mogą się lekko zmienić także u osób bez poprawionych ocen.

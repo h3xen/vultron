@@ -5,7 +5,7 @@ class VultronPlanCard extends HTMLElement {
     this._autoShiftedToNext = false;
     this._lineUpdater = null;
 
-    // Cache chroniący przed wyciekami CPU (Render Leak)
+    // Cache stanu - render tylko przy zmianie danych
     this._cachedPlanState = null;
     this._cachedFreqState = null;
     this._cachedWeekOffset = null;
@@ -21,11 +21,7 @@ class VultronPlanCard extends HTMLElement {
       .replace(/'/g, '&#39;');
   }
 
-  // Deterministyczny kolor "własnych zajęć" (z kalendarza) przypisany do
-  // konkretnego ucznia. Ten sam uczeń zawsze dostaje ten sam kolor (liczony
-  // z jego identyfikatora encji), różni uczniowie dostają różne kolory z palety
-  // - dzięki temu przy wielu dzieciach łatwo odróżnić, czyje to zajęcia,
-  // a jednocześnie kolor nie skacze losowo przy każdym odświeżeniu.
+  // Stały kolor "własnych zajęć" ucznia, liczony z identyfikatora encji.
   _customLessonColor() {
     if (this._customColorCache) return this._customColorCache;
     const PALETTE = ['#00897b', '#3f51b5', '#c2185b', '#6d4c41', '#0097a7', '#827717', '#ad1457', '#512da8'];
@@ -42,7 +38,7 @@ class VultronPlanCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
 
-    // 1. INICJALIZACJA DOM I ZDARZEŃ (Wykona się tylko raz!)
+    // 1. Inicjalizacja DOM i zdarzeń (raz)
     if (!this.content) {
       this.innerHTML = `
         <style>
@@ -106,7 +102,7 @@ class VultronPlanCard extends HTMLElement {
       this.timeLine = this.querySelector('#time-line');
       this.timeLabel = this.querySelector('#time-label');
 
-      // Podpinanie zdarzeń TYLKO RAZ
+      // Zdarzenia podpinane raz
       this.querySelector('#prev-week').addEventListener('click', () => {
         if (this._weekOffset > -1) {
           this._weekOffset--;
@@ -139,7 +135,7 @@ class VultronPlanCard extends HTMLElement {
       this._cachedFreqState === freqState &&
       this._cachedWeekOffset === this._weekOffset
     ) {
-      // Pilnujemy, by kreska nie znikała przy innych odświeżeniach HA
+      // Kreska czasu ma przetrwać odświeżenia HA bez zmiany danych
       this.positionLine();
       return;
     }
@@ -168,7 +164,7 @@ class VultronPlanCard extends HTMLElement {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
-  // Ulepszona funkcja rysująca żółtą kreskę
+  // Rysuje kreskę aktualnej godziny
   positionLine() {
     if (!this.isConnected) return;
     if (this._weekOffset !== 0 || !this.content || !this.timeLine) {
@@ -358,11 +354,11 @@ class VultronPlanCard extends HTMLElement {
 
     this.content.innerHTML = html || `<tr><td colspan="6" style="text-align: center; padding: 20px;">Brak zajęć</td></tr>`;
 
-    // Potrójny strzał do układu graficznego (niweluje opóźnienia HA)
+    // Ponowne pozycjonowanie po ułożeniu kafelków przez HA
     if (this.isConnected) {
-      this.positionLine(); // Próba 1 (natychmiast)
-      setTimeout(() => this.positionLine(), 100); // Próba 2 (po 0.1s)
-      setTimeout(() => this.positionLine(), 400); // Próba 3 (po ułożeniu kafelków przez HA)
+      this.positionLine();
+      setTimeout(() => this.positionLine(), 100);
+      setTimeout(() => this.positionLine(), 400);
     }
   }
 
@@ -370,8 +366,7 @@ class VultronPlanCard extends HTMLElement {
     if (!config.entity) throw new Error("Entity missing");
     this.config = config;
 
-    // Wcześniejszy podgląd następnego tygodnia (np. w piątek wieczorem) -
-    // czysto po stronie przeglądarki, nie zmienia danych w encjach HA.
+    // Podgląd następnego tygodnia (np. w piątek wieczorem) - tylko w przeglądarce.
     const prog = config.next_week_from;
     const DNI_PROG = { pon: 0, wt: 1, sr: 2, czw: 3, pt: 4, sob: 5, nie: 6 };
     if (prog && DNI_PROG[prog.day] !== undefined) {

@@ -56,7 +56,7 @@ GPE Gdansk accounts can use the optional `gdansk` provider. See the
 - [@KamillJot](https://github.com/KamillJot) — wsparcie dla [GPE Gdańsk](GDANSK.md)
 
 ##
- **Wersja:** 7.1.5 \
+ **Wersja:** 7.1.6 \
 **Nazwa Kodowa:** Jungfru ♍
 
 # 📖 Spis treści
@@ -228,6 +228,11 @@ klucz do drzwi, tylko cyfrowy.
    bez skopiowania, będziesz musiał zrobić nowy. Wklej go od razu w jakimś
    bezpiecznym miejscu (np. notatnik na komputerze) — będzie potrzebny za
    chwilę.
+9. **Uwaga:** taki token daje pełny dostęp do Twojego Home Assistanta (tak jak
+   Twoje konto). Nie wysyłaj go nikomu, a gdy przestaniesz używać Vultrona —
+   usuń go w tym samym miejscu, w którym go utworzyłeś. Po kroku 6 warto też
+   ograniczyć dostęp do plików z tokenem i hasłem tylko dla siebie:
+   `chmod 600 secrets/ha_token.txt data/options.json`.
 
 ---
 
@@ -536,7 +541,7 @@ W zakładce **Konfiguracja** zainstalowanego dodatku wypełnij dane dostępowe:
 1. Kliknij **Zapisz**.
 2. Kliknij **Uruchom**.
 
-**Ważne:** Przy pierwszym uruchomieniu zalecane jest śledzenie zakładki **Logi**, aby upewnić się, że proces logowania przebiega pomyślnie. Skrypt posiada zabezpieczenie, które w razie błędnego hasła automatycznie zatrzyma kontener, chroniąc Twoje konto przed blokadą.
+**Ważne:** Przy pierwszym uruchomieniu zalecane jest śledzenie zakładki **Logi**, aby upewnić się, że proces logowania przebiega pomyślnie. Skrypt posiada zabezpieczenie: jeśli eduVULCAN dwa razy odrzuci logowanie (złe hasło lub weryfikacja) bez udanego logowania pomiędzy, dodatek się zatrzymuje, chroniąc Twoje konto przed blokadą. Stan synchronizacji i ostatni błąd pokazuje encja `sensor.vultron_status` (`ok` / `error` / `authentication_error`). Chwilowe awarie portalu (przerwa techniczna, błąd serwera) nie zatrzymują dodatku - kolejna próba nastąpi z wydłużoną przerwą.
 
 ---
 
@@ -677,6 +682,8 @@ entity: sensor.vultron_przedszkole_plan_jan_kowalski_curr
 ```
 Karta sama dogrywa `_prev`/`_next` przy przełączaniu strzałkami - w konfiguracji podajesz tylko encję z sufiksem `_curr`, ale wszystkie trzy encje (`_prev`, `_curr`, `_next`) muszą istnieć dla danego dziecka.
 
+Każdy dzień (Pon–Pt) to kolumna z listą zajęć po kolei - przedszkole ma nieregularne, nakładające się godziny, więc nie ma wspólnej siatki godzin jak w planie szkolnym. W bieżącym tygodniu zajęcia trwające właśnie teraz mają znacznik „TERAZ", a w kolumnie dzisiejszej żółta kreska z godziną oddziela zajęcia już rozpoczęte od tych, które dopiero się zaczną.
+
 ### 🧸 Przedszkole — Obecność (Kalendarz miesięczny + godziny)
 ```yaml
 type: custom:vultron-przedszkole-obecnosc-card
@@ -747,6 +754,10 @@ mozna też użyć
     red: 0
 ```
 ## 🔍 Monitoring
+`sensor.vultron_status` (eduVULCAN) i `sensor.vultron_gdansk_status` (GPE Gdańsk) pokazują stan ostatniej synchronizacji: `ok`, `error` (chwilowy problem - kolejna próba nastąpi sama) albo `authentication_error` (logowanie odrzucone - dodatek się zatrzymał, sprawdź login i hasło). Atrybut `error` zawiera opis, a `last_success` czas ostatniej udanej synchronizacji.
+
+Jeśli lista w encji (uwagi, zebrania, terminarz, osiągnięcia) nie mieści się w limicie Home Assistanta, najstarsze wpisy są pomijane, a atrybut `pominiete` mówi ile. Stan encji nadal pokazuje pełną liczbę wpisów.
+
 Oblicza sumaryczny rozmiar atrybutów wszystkich encji sensor.vultron_* w Home Assistant (w bajtach). Tworzy szczegółowy raport z rozmiarem każdej encji. Generuje listę ostrzeżeń dla encji przekraczających próg ostrzegawczy (14 000 B). Cel: wczesne wykrycie dużych encji, które mogą spowolnić HA lub przekroczyć limity ~16 kB. Sensory tworzone automatycznie i automatycznie aktualizowane.
 
 ```yaml
@@ -785,6 +796,20 @@ entity: binary_sensor.vultron_rozmiar_alert
 vertical: false
 features_position: bottom
 ```
+
+### 🔒 Prywatność: historia encji (recorder)
+Home Assistant zapisuje w bazie historii każdą zmianę atrybutów encji - także treść wiadomości, uwag i oceny dzieci. Jeśli nie potrzebujesz wykresów historii dla tych encji, wyłącz ich zapis w `configuration.yaml`:
+
+```yaml
+recorder:
+  exclude:
+    entity_globs:
+      - sensor.vultron_wiadomosci_*
+      - sensor.vultron_przedszkole_wiadomosci_*
+      - sensor.vultron_uwagi_*
+      - sensor.vultron_oceny_*
+```
+Automatyzacje i karty działają dalej normalnie (korzystają z bieżącego stanu, nie z historii). Mniejsza baza historii to też mniej zapisów na karcie SD w Raspberry Pi.
 
 ## 🔄 Automatyzacja
 
@@ -932,10 +957,9 @@ Znalazłeś błąd lub masz pomysł na nową funkcję? Postępuj zgodnie z poni�
    - Sprawdź, czy problem nie został już zgłoszony w [GitHub Issues](https://github.com/htomasz/vultron/issues).
    - Jeśli nie, otwórz nowe zgłoszenie [tutaj](https://github.com/htomasz/vultron/issues).
 
-3. **Sugestie (Features):** Masz pomysł na nową funkcję? Otwórz zgłoszenie typu "Feature Request" w zakładce Issues.
+3. **Sugestie (Features):** Masz pomysł na nową funkcję? Otwórz zgłoszenie typu „Pomysł na funkcję” w zakładce Issues.
 
 4. **Chcesz pomóc w kodzie?** Zajrzyj do [🤝 CONTRIBUTING.md](https://github.com/htomasz/vultron/blob/main/CONTRIBUTING.md) — jak uruchomić testy, gdzie co leży i czego nie wklejać do logów. Zasady zachowania: [📜 CODE_OF_CONDUCT.md](https://github.com/htomasz/vultron/blob/main/CODE_OF_CONDUCT.md).
-
 
 ## 🗑️ Odinstalowanie
 Jeśli zdecydujesz się usunąć dodatek:

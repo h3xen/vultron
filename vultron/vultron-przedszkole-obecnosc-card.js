@@ -8,9 +8,7 @@ class VultronPrzedszkoleObecnoscCard extends HTMLElement {
     this._cachedTab = null;
   }
 
-  // Zabezpieczenie przed atakami XSS - friendly_name pochodzi z konfiguracji
-  // dodatku (imię i nazwisko dziecka), traktujemy je tak samo jak dane z
-  // zewnętrznego API w pozostałych kartach.
+  // Escape XSS - friendly_name (imię i nazwisko dziecka) trafia do innerHTML.
   _esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')
@@ -155,9 +153,8 @@ class VultronPrzedszkoleObecnoscCard extends HTMLElement {
     this.tabGodziny.style.cssText += this._activeTab === 'godziny' ? activeStyle : inactiveStyle;
 
     if (this._activeTab === 'godziny') {
-      // Zakładka "Godziny" pokazuje zawsze BIEŻĄCY miesiąc (tak dostarcza
-      // backend - atrybut "miesiac" nie jest przesuwany strzałkami), więc
-      // strzałki nawigacji kalendarza i sama siatka/legenda są tu ukryte.
+      // "Godziny" dotyczą zawsze bieżącego miesiąca (atrybut "miesiac" z backendu),
+      // więc strzałki, siatka i legenda kalendarza są tu ukryte.
       this.querySelector('#prev-month').style.visibility = 'hidden';
       this.querySelector('#next-month').style.visibility = 'hidden';
       this.monthLabel.innerText = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
@@ -179,11 +176,8 @@ class VultronPrzedszkoleObecnoscCard extends HTMLElement {
     const viewDate = new Date(now.getFullYear(), now.getMonth() + this._monthOffset, 1);
     this.monthLabel.innerText = `${monthNames[viewDate.getMonth()]} ${viewDate.getFullYear()}`;
 
-    // Siatka kalendarza: puste komórki na początek (dopasowanie do dnia
-    // tygodnia 1-go dnia miesiąca w 5-dniowym układzie Pon-Pt), potem po
-    // jednej komórce na każdy dzień ROBOCZY miesiąca - soboty i niedziele
-    // są pomijane całkowicie (przedszkole nie ma w te dni zajęć, więc nie
-    // ma tam sensu pokazywać pustej/szarej komórki).
+    // Siatka Pon-Pt: puste komórki do dnia tygodnia 1. dnia miesiąca, potem
+    // komórka na każdy dzień roboczy (weekendy pomijane).
     const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
     const firstDayIdx = (firstDay.getDay() + 6) % 7; // 0 = poniedziałek ... 6 = niedziela
     const leadingBlanks = firstDayIdx > 4 ? 0 : firstDayIdx; // jeśli 1. dzień to weekend, brak wcięcia

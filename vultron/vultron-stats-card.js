@@ -6,9 +6,7 @@ class VultronStatsCard extends HTMLElement {
     this._lastRowsLength = null;          // cache długości tabeli
   }
 
-  // Escape wszystkiego, co trafia do innerHTML z danych pochodzących z
-  // zewnętrznego API (Vulcan) - nazwy przedmiotów wpisuje szkoła/nauczyciel,
-  // więc traktujemy je jako niezaufany input, tak samo jak w pozostałych kartach.
+  // Escape XSS - dane z API Vulcan trafiają do innerHTML.
   _esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')

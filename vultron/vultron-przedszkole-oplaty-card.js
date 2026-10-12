@@ -4,8 +4,7 @@ class VultronPrzedszkoleOplatyCard extends HTMLElement {
     this._cachedState = null;
   }
 
-  // Zabezpieczenie przed atakami XSS - dane pochodzą z zewnętrznego API
-  // (Vulcan), traktujemy je tak samo jak w pozostałych kartach dodatku.
+  // Escape XSS - dane z API Vulcan trafiają do innerHTML.
   _esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')

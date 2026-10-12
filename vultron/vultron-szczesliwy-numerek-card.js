@@ -99,7 +99,7 @@ class VultronSzczesliwyNumerekCard extends HTMLElement {
   }
 
   disconnectedCallback() {
-    // Na wszelki wypadek – choć karta nie ma timerów ani listenerów
+    // Brak timerów i listenerów - tylko reset cache
     this._lastNumer = null;
   }
 

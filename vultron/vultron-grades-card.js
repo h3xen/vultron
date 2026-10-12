@@ -3,15 +3,13 @@ class VultronGradesCard extends HTMLElement {
     super();
     this._sortMode = null;
     this._periodMode = null; // null oznacza auto-wykrywanie z encji
-    this._listeners = [];    // przechowujemy listenery do czyszczenia
+    this._listeners = [];    // do czyszczenia w disconnectedCallback
     this._cachedState = null;
     this._cachedSortMode = null;
     this._cachedPeriodMode = null;
   }
 
-  // Zabezpieczenie przed XSS - nazwa przedmiotu, wartość oceny i opis
-  // kolumny pochodzą z API Vulcan i nie są HTML-escape'owane po stronie
-  // backendu, więc muszą być escape'owane przed wstawieniem do innerHTML.
+  // Escape XSS - dane z API Vulcan trafiają do innerHTML.
   _esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')
@@ -21,8 +19,7 @@ class VultronGradesCard extends HTMLElement {
       .replace(/'/g, '&#39;');
   }
 
-  // Ocena z ocenami poprawionymi w nawiasie, np. "5- (2)" (pole "pop" z backendu).
-  // Ocena poprawiona bez poprawy w kolumnie ("poprawiona") - cała w nawiasie.
+  // Ocena z poprawami w nawiasie, np. "5- (2)" (pole "pop"); ocena "poprawiona" - cała w nawiasie.
   _gradeHtml(o) {
     if (o.poprawiona) return `(${this._esc(o.w)})`;
     const pop = Array.isArray(o.pop) ? o.pop : [];
@@ -202,12 +199,16 @@ class VultronGradesCard extends HTMLElement {
     this._clearListeners();
   }
 
-  // reszta metod bez zmian (getGradeColor, renderBySubject, renderByDate, setConfig, getCardSize)
   getGradeColor(val) {
     let color = "var(--primary-text-color)";
     if (!val) return color;
 
-    const v = String(val).toUpperCase();
+    let v = String(val).toUpperCase().trim();
+
+    // Czysta ocena procentowa ("47 (%)", "47%") - niebieska.
+    if (/^\d{1,3}([.,]\d+)?\s*\(?\s*%\s*\)?$/.test(v)) return "#2196F3";
+    // Ocena z adnotacją procentową ("3 (56%)") - kolor wg oceny, nie cyfr procentu.
+    v = v.replace(/\s*\(\s*\d{1,3}([.,]\d+)?\s*%\s*\)$/, '');
 
     if (v.includes("%")) color = "#2196F3";
     else if (/(^|[^A-Z])(NB|NP|BZ)([^A-Z]|$)/.test(v)) color = "#9E9E9E";
@@ -225,8 +226,7 @@ class VultronGradesCard extends HTMLElement {
       const average = p.srednia;
       const avgPct = (p.srednia_proc != null && Number.isFinite(Number(p.srednia_proc))) ? Number(p.srednia_proc) : null;
       const avgLine = (txt) => `<div style="font-size: 0.8em; opacity: 0.6; font-weight: normal; margin-top: 2px;">${txt}</div>`;
-      // "≈" gdy średnia wyliczona przez Vultron (API jej nie podało) - wartości
-      // +/- ustawia szkoła, więc wynik może się nieznacznie różnić od Vulcana.
+      // "≈" - średnia wyliczona przez Vultron (API jej nie podało), może się nieznacznie różnić od Vulcana.
       const approx = p.srednia_zrodlo === 'wyliczona' ? '≈ ' : '';
       const avgHtml = (average ? avgLine(`Średnia: ${approx}${this._esc(average)}`) : '') +
                       (avgPct !== null ? avgLine(`Średnia: ${avgPct}%`) : '');
@@ -310,7 +310,7 @@ class VultronGradesCard extends HTMLElement {
                 font-size: 0.78em;
                 white-space: nowrap;
               ">
-                ${displayDate}
+                ${this._esc(displayDate)}
               </span>
             </div>
           </td>
@@ -331,8 +331,7 @@ class VultronGradesCard extends HTMLElement {
   renderFinal(state) {
     const lista = state.attributes.lista_przedmiotow || [];
 
-    // Pokazujemy wszystkie przedmioty które mają oceny cząstkowe lub są Zachowaniem
-    // (Zachowanie nie ma cyfr, ale zawsze powinno być widoczne)
+    // Przedmioty z ocenami cząstkowymi oraz Zachowanie (bez cyfr, ale zawsze widoczne)
     const rows = lista
       .map(p => ({
         przedmiot:      p.przedmiot  || '',
@@ -365,14 +364,14 @@ class VultronGradesCard extends HTMLElement {
       const propCell = r.proponowana_num !== null
         ? `<div style="text-align: center;">
              <div style="font-size: 0.7em; opacity: 0.6; margin-bottom: 2px;">proponowana</div>
-             <span style="font-weight: bold; font-size: 1.1em; color: ${propColor};">${r.proponowana_num}</span>
+             <span style="font-weight: bold; font-size: 1.1em; color: ${propColor};">${this._esc(r.proponowana_num)}</span>
            </div>`
         : `<div style="text-align: center; opacity: 0.3; font-size: 0.8em;">—</div>`;
 
       const okrCell = r.okresowa_num !== null
         ? `<div style="text-align: center;">
              <div style="font-size: 0.7em; opacity: 0.6; margin-bottom: 2px;">końcowa</div>
-             <span style="font-weight: bold; font-size: 1.1em; color: ${okrColor};">${r.okresowa_num}</span>
+             <span style="font-weight: bold; font-size: 1.1em; color: ${okrColor};">${this._esc(r.okresowa_num)}</span>
            </div>`
         : `<div style="text-align: center; opacity: 0.3; font-size: 0.8em;">—</div>`;
 

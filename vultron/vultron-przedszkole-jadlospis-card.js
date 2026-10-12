@@ -7,9 +7,7 @@ class VultronPrzedszkoleJadlospisCard extends HTMLElement {
     this._cachedDayOffset = null;
   }
 
-  // Zabezpieczenie przed atakami XSS - nazwy posiłków, składniki i alergeny
-  // pochodzą z zewnętrznego API (Vulcan), traktujemy je jak niezaufany input,
-  // tak samo jak w pozostałych kartach dodatku.
+  // Escape XSS - dane z API Vulcan trafiają do innerHTML.
   _esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')
@@ -63,8 +61,7 @@ class VultronPrzedszkoleJadlospisCard extends HTMLElement {
         this._forceUpdate();
       });
 
-      // Delegacja zdarzeń - obsługuje kliknięcia w nagłówki posiłków
-      // dodawane dynamicznie przy każdym renderowaniu.
+      // Delegacja zdarzeń - nagłówki posiłków powstają przy każdym renderze.
       this.content.addEventListener('click', (ev) => {
         const header = ev.target.closest('[data-meal-key]');
         if (!header) return;

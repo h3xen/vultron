@@ -1,9 +1,9 @@
 class VultronOsiagnieciaCard extends HTMLElement {
   constructor() {
     super();
-    this._sortOrder = 'desc'; // Domyślnie najnowsze
+    this._sortOrder = 'desc'; // najnowsze najpierw
 
-    // Zmienne do zapobiegania wyciekom pamięci/CPU (State Caching)
+    // Cache stanu
     this._cachedState = null;
     this._cachedSortOrder = null;
   }
@@ -13,7 +13,7 @@ class VultronOsiagnieciaCard extends HTMLElement {
     const entityId = this.config.entity;
     const newState = hass.states[entityId];
 
-    // 1. Inicjalizacja DOM i Event Listenerów (Tylko raz!)
+    // 1. Inicjalizacja DOM i zdarzeń (raz)
     if (!this.content) {
       this.innerHTML = `
         <ha-card>
@@ -88,7 +88,7 @@ class VultronOsiagnieciaCard extends HTMLElement {
       });
     }
 
-    // 2. Optymalizacja wycieków CPU - renderuj tylko przy zmianie danych lub sortowania
+    // 2. Render tylko przy zmianie danych lub sortowania
     if (this._cachedState === newState && this._cachedSortOrder === this._sortOrder) {
       return;
     }
@@ -105,7 +105,7 @@ class VultronOsiagnieciaCard extends HTMLElement {
     this.hass = this._hass;
   }
 
-  // Funkcja zabezpieczająca przed atakami XSS
+  // Escape XSS
   _esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')

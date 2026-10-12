@@ -2,14 +2,12 @@ class VultronUwagiCard extends HTMLElement {
   constructor() {
     super();
     this._sortOrder = null;
-    this._listeners = [];    // przechowujemy listenery do czyszczenia
+    this._listeners = [];    // do czyszczenia w disconnectedCallback
     this._cachedState = null;
     this._cachedSortOrder = null;
   }
 
-  // Zabezpieczenie przed XSS - treść i autor uwagi pochodzą z API Vulcan
-  // i nie są oczyszczane po stronie backendu, więc muszą być escape'owane
-  // przed wstawieniem do innerHTML.
+  // Escape XSS - dane z API Vulcan trafiają do innerHTML.
   _esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')
@@ -246,7 +244,7 @@ class VultronUwagiCard extends HTMLElement {
           <div style="flex:1; position: relative; padding-right: 80px;">
             <div style="position: absolute; top: 10px; right: 12px;">
               <span style="font-weight: bold; color: var(--primary-color); background: var(--secondary-background-color); padding: 3px 8px; border-radius: 6px; font-size: 0.82em; white-space: nowrap;">
-                ${displayDate}
+                ${this._esc(displayDate)}
               </span>
             </div>
 

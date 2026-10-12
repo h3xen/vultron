@@ -4,14 +4,12 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
     this._weekOffset = 0;
     this._lineUpdater = null;
 
-    // Cache chroniący przed wyciekami CPU (Render Leak)
+    // Cache stanu - render tylko przy zmianie danych
     this._cachedPlanState = null;
     this._cachedWeekOffset = null;
   }
 
-  // Zabezpieczenie przed atakami XSS - dane (nazwy zajęć, prowadzący)
-  // pochodzą z zewnętrznego API (Vulcan), więc traktujemy je jako
-  // niezaufany input, tak samo jak w pozostałych kartach dodatku.
+  // Escape XSS - dane z API Vulcan trafiają do innerHTML.
   _esc(str) {
     return String(str ?? '')
       .replace(/&/g, '&amp;')
@@ -24,7 +22,7 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
 
-    // 1. INICJALIZACJA DOM I ZDARZEŃ (Wykona się tylko raz!)
+    // 1. Inicjalizacja DOM i zdarzeń (raz)
     if (!this.content) {
       this.innerHTML = `
         <ha-card>
@@ -68,7 +66,7 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
       this.studentLabel = this.querySelector('#student-name');
       this.dayHeaders = this.querySelectorAll('.pplan-day-header');
 
-      // Podpinanie zdarzeń TYLKO RAZ
+      // Zdarzenia podpinane raz
       this.querySelector('#prev-week').addEventListener('click', () => {
         if (this._weekOffset > -1) {
           this._weekOffset--;
@@ -83,8 +81,7 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
         }
       });
 
-      // Oznaczenie "TERAZ" zależy od zegara, nie od stanu encji - odświeżamy
-      // je co minutę, bo sama encja zmienia się rzadko.
+      // "TERAZ" zależy od zegara, nie od encji - odświeżane co minutę.
       this._lineUpdater = setInterval(() => this._refreshNow(), 60000);
     }
 
@@ -116,6 +113,15 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
     this.hass = this._hass;
   }
 
+  // HA odłącza i ponownie podłącza kartę przy zmianie widoku - interwał skasowany
+  // w disconnectedCallback trzeba odtworzyć.
+  connectedCallback() {
+    if (this.content && !this._lineUpdater) {
+      this._lineUpdater = setInterval(() => this._refreshNow(), 60000);
+      this._refreshNow();
+    }
+  }
+
   disconnectedCallback() {
     if (this._lineUpdater) {
       clearInterval(this._lineUpdater);
@@ -140,9 +146,8 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
     this.updatePlan(this._cachedPlanState, 'curr');
   }
 
-  // Przedszkole ma nieregularne, nakładające się bloki godzinowe, więc zamiast
-  // siatki wspólnych slotów (jak w planie szkolnym) każdy dzień to osobna
-  // kolumna z chronologiczną listą zajęć.
+  // Bloki godzinowe są nieregularne i nakładają się, więc każdy dzień to osobna
+  // kolumna z chronologiczną listą zajęć (bez wspólnej siatki slotów).
   updatePlan(planState, suffix) {
     if (!planState || !planState.attributes.zajecia) {
       this.content.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px;">Brak danych planu (${suffix})</td></tr>`;
@@ -181,6 +186,14 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
     }
 
     const nowM = now.getHours() * 60 + now.getMinutes();
+    const nowLabel = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+    // Kreska aktualnej godziny (tylko dziś): przed pierwszymi zajęciami, które jeszcze się nie zaczęły.
+    const nowMarker = `
+          <div style="display: flex; align-items: center; gap: 4px; margin: 2px 0 8px;">
+            <div style="flex: 1; height: 2px; background: #ffff00; box-shadow: 0 0 4px rgba(255, 255, 0, 0.6);"></div>
+            <span style="font-size: 0.7em; font-weight: 900; background: #ffff00; color: #000; padding: 0 6px; border-radius: 8px;">${nowLabel}</span>
+            <div style="flex: 1; height: 2px; background: #ffff00; box-shadow: 0 0 4px rgba(255, 255, 0, 0.6);"></div>
+          </div>`;
     let html = "<tr>";
 
     weekDates.forEach(date => {
@@ -190,8 +203,13 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
         .sort((a, b) => String(a.g ?? '').localeCompare(String(b.g ?? '')));
 
       let cellContent = "";
+      let markerPlaced = !isToday || dayItems.length === 0;
       dayItems.forEach(z => {
         const [sM, eM] = this._slotMinutes(z.g);
+        if (!markerPlaced && sM !== null && sM > nowM) {
+          cellContent += nowMarker;
+          markerPlaced = true;
+        }
         const isCur = isToday && sM !== null && nowM >= sM && nowM < eM;
         cellContent += `
           <div style="padding: 6px 8px; margin-bottom: 6px; border-radius: 6px; border-left: 3px solid ${isCur ? 'var(--accent-color)' : 'var(--primary-color)'}; background: ${isCur ? 'rgba(var(--rgb-accent-color), 0.15)' : 'var(--secondary-background-color)'};">
@@ -203,6 +221,8 @@ class VultronPrzedszkolePlanCard extends HTMLElement {
             ${z.n ? `<div style="font-size: 0.72em; opacity: 0.7; margin-top: 1px;">${this._esc(z.n)}</div>` : ''}
           </div>`;
       });
+
+      if (!markerPlaced) cellContent += nowMarker;   // wszystkie dzisiejsze zajęcia już się zaczęły
 
       if (!cellContent) {
         cellContent = '<div style="text-align: center; opacity: 0.4; padding: 8px 0; font-size: 0.8em;">—</div>';
