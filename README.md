@@ -46,9 +46,7 @@
 
 # Vultron (Jungfru)
 
-GPE Gdansk accounts can use the optional `gdansk` provider. See the
-GPE setup, supported data and limitations: [PL](GDANSK.pl.md) | [EN](GDANSK.md).
-The default remains eduVULCAN.
+Konta GPE Gdańsk mogą korzystać z opcjonalnego dostawcy `gdansk`. Konfigurację GPE, obsługiwane dane i ograniczenia opisuje ten dokument: [PL](https://github.com/htomasz/vultron/blob/main/GDANSK.pl.md) | [EN](https://github.com/htomasz/vultron/blob/main/GDANSK.md). Domyślnie nadal używany jest eduVULCAN.
 
 **Vultron** to **totalnieNIEzaawansowana** integracja Home Assistant z systemem dziennika elektronicznego **EduVulcan.pl**. Dodatek został zaprojektowany, aby dostarczać rodzicom i uczniom kluczowe informacje o edukacji w sposób przejrzysty, zautomatyzowany i bezpieczny.
 
