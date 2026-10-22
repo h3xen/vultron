@@ -9,12 +9,12 @@ actions:
   - variables:
       old_uwagi: >-
         {{ trigger.from_state.attributes.uwagi | map(attribute='id') | list |
-        default([]) }}
+        default([]) if trigger.from_state else [] }}
       new_uwagi: "{{ trigger.to_state.attributes.uwagi | default([]) }}"
       nowe_wpisy: |
         {% set ns = namespace(items=[]) %} {% for n in new_uwagi %}
           {% if n.id | string not in old_uwagi | map('string') | list %}
-            {% set emoji = '🌟' if n.typ == 'pozytywna' else '⚠️' %}
+            {% set emoji = '🌟' if n.typ == 'pozytywna' else ('⚠️' if n.typ == 'negatywna' else 'ℹ️') %}
             {% set msg = "### " ~ emoji ~ " " ~ n.kategoria ~ "\n**Data:** " ~ n.data ~ "\n**Treść:** " ~ n.tresc ~ "\n\n---\n**Autor:** " ~ n.autor %}
             {% set ns.items = ns.items + [msg] %}
           {% endif %}
@@ -30,6 +30,6 @@ actions:
         - data:
             title: >-
               HA Nowy wpis w dzienniku: {{
-              trigger.to_state.attributes.student_name }}
+              trigger.to_state.attributes.friendly_name.split(': ') | last }}
             message: "{{ repeat.item }}"
           action: persistent_notification.create

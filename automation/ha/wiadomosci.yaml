@@ -9,7 +9,7 @@ actions:
   - variables:
       old_sigs: >
         {% set ns = namespace(items=[]) %} {% for m in
-        trigger.from_state.attributes.wiadomosci | default([]) %}
+        (trigger.from_state.attributes.wiadomosci | default([]) if trigger.from_state else []) %}
           {% set ns.items = ns.items + [m.data ~ "_" ~ m.nadawca ~ "_" ~ m.temat] %}
         {% endfor %} {{ ns.items }}
       new_msgs: >
@@ -29,7 +29,7 @@ actions:
       for_each: "{{ new_msgs }}"
       sequence:
         - data:
-            title: "HA Nowa wiadomość: {{ trigger.to_state.attributes.student_name }}"
+            title: "HA Nowa wiadomość: {{ trigger.to_state.attributes.friendly_name.split(': ') | last }}"
             message: |-
               **Od:** {{ repeat.item.nadawca }}
               **Temat:** {{ repeat.item.temat }}

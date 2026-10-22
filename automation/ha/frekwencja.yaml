@@ -13,19 +13,19 @@ actions:
         "4": Spóźnienie ⚠️
         "5": Spóźnienie usprawiedliwione ⏳
         "7": Zwolnienie 🚪
-      student_slug: "{{ trigger.entity_id.split('_')[-1] }}"
-      plan_entity: sensor.vultron_plan_{{ student_slug }}
-      old_wpisy: "{{ trigger.from_state.attributes.wpisy | default([]) }}"
+      student_slug: "{{ trigger.entity_id | replace('sensor.vultron_freq_', '') }}"
+      plan_entity: sensor.vultron_plan_{{ student_slug }}_curr
+      old_wpisy: "{{ trigger.from_state.attributes.wpisy | default([]) if trigger.from_state else [] }}"
       new_wpisy: "{{ trigger.to_state.attributes.wpisy | default([]) }}"
       nowe_alerty: |
         {% set ns = namespace(items=[]) %} {% for n in new_wpisy %}
-          {% if n.k | int in cat_map.keys() %}
+          {% if n.k | string in cat_map.keys() %}
             {% set juz_bylo = old_wpisy | selectattr('d', 'eq', n.d) | selectattr('t', 'eq', n.t) | selectattr('k', 'eq', n.k) | list | count > 0 %}
             {% if not juz_bylo %}
               {% set lekcje = state_attr(plan_entity, 'lekcje') | default([]) %}
-              {% set lekcja = lekcje | selectattr('d', 'eq', n.d) | select(attribute='g', target='startswith', value=n.t) | first %}
+              {% set lekcja = lekcje | selectattr('d', 'eq', n.d) | selectattr('g', 'match', '^' ~ n.t) | first | default(none) %}
               {% set przedmiot = lekcja.p if lekcja else "Lekcja" %}
-              {% set ns.items = ns.items + [cat_map[n.k|int] ~ " na lekcji: " ~ przedmiot ~ " (" ~ n.t ~ ")"] %}
+              {% set ns.items = ns.items + [cat_map[n.k | string] ~ " na lekcji: " ~ przedmiot ~ " (" ~ n.t ~ ")"] %}
             {% endif %}
           {% endif %}
         {% endfor %} {{ ns.items }}

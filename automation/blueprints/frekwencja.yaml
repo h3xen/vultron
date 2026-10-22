@@ -12,7 +12,7 @@ blueprint:
             - domain: sensor
     vultron_plan_sensor:
       name: "Sensor planu lekcji"
-      description: "Wymagany do pobrania nazwy przedmiotu (np. sensor.vultron_plan_jan_kowalski)"
+      description: "Wymagany do pobrania nazwy przedmiotu (np. sensor.vultron_plan_jan_kowalski_curr)"
       selector:
         entity:
           filter:
@@ -41,7 +41,7 @@ action:
         "7": "Zwolnienie 🚪"
 
       plan_sensor: !input vultron_plan_sensor
-      old_wpisy: "{{ trigger.from_state.attributes.wpisy | default([]) }}"
+      old_wpisy: "{{ trigger.from_state.attributes.wpisy | default([]) if trigger.from_state else [] }}"
       new_wpisy: "{{ trigger.to_state.attributes.wpisy | default([]) }}"
 
       # Logika wykrywania zmian i dopasowania do planu lekcji

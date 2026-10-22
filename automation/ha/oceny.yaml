@@ -72,7 +72,8 @@ actions:
               {# Wyciągamy czyste imię i informację o okresie z friendly_name #}
               {% set fn = trigger.to_state.attributes.friendly_name %}
               {% set uczen = fn.split(' (')[0].replace('Oceny: ', '') %}
-              {% set okres = "z 1. semestru" if "Okres 1" in fn else "z 2. semestru" %}
+              {% set nr = trigger.to_state.attributes.period_number | default(0) | int(0) %}
+              {% set okres = "z " ~ nr ~ ". semestru" if nr > 0 else "z nieznanego semestru" %}
 
               {{ uczen }} otrzymał(a) **{{ repeat.item.ocena }}** z przedmiotu **{{ repeat.item.przedmiot }}** ({{ okres }}).
 

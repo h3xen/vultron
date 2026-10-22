@@ -54,7 +54,7 @@ Konta GPE Gdańsk mogą korzystać z opcjonalnego dostawcy `gdansk`. Konfiguracj
 - [@KamillJot](https://github.com/KamillJot) — wsparcie dla [GPE Gdańsk](GDANSK.md)
 
 ##
- **Wersja:** 7.1.6 \
+ **Wersja:** 7.1.7 \
 **Nazwa Kodowa:** Jungfru ♍
 
 # 📖 Spis treści
@@ -844,7 +844,7 @@ Zapomnij o ręcznym kopiowaniu kodu YAML. Dzięki **Blueprints (Schematom)** mo�
 #### 🎓 Jak używać?
 1. Kliknij przycisk **Importuj** przy wybranym schemacie.
 2. Zatwierdź import w swojej instancji Home Assistant.
-3. Wybierz odpowiedni sensor Twojego dziecka (np. `sensor.vultron_oceny_jan_kowalski`).
+3. Wybierz odpowiedni sensor Twojego dziecka (np. `sensor.vultron_oceny_jan_kowalski_p1`).
 4. Wybierz telefon, na który mają przychodzić powiadomienia, i kliknij **Zapisz**.
 
 ---
@@ -864,11 +864,11 @@ Zapomnij o ręcznym kopiowaniu kodu YAML. Dzięki **Blueprints (Schematom)** mo�
 #### 💡 Personalizacja powiadomień
 W sekcji **Akcje** każdego Blueprintf-a możesz używać dynamicznych zmiennych, aby dostosować treść powiadomienia:
 
-*   **Oceny:** `{{ uczen }}`, `{{ przedmiot }}`, `{{ ocena }}`, `{{ opis }}`, `{{ data }}`
+*   **Oceny:** `{{ uczen }}`, `{{ przedmiot }}`, `{{ ocena }}`, `{{ opis }}`, `{{ data }}`, `{{ okres }}`
 *   **Frekwencja:** `{{ uczen }}`, `{{ wiadomosc }}`
 *   **Zmiana Planu:** `{{ uczen }}`, `{{ wiadomosc }}`
-*   **Uwagi:** `{{ uczen }}`, `{{ kategoria }}`, `{{ tresc }}`, `{{ autor }}`, `{{ wiadomosc }}`
-*   **Wiadomości:** `{{ uczen }}`, `{{ nadawca }}`, `{{ temat }}`, `{{ wiadomosc }}`
+*   **Uwagi:** `{{ uczen }}`, `{{ kategoria }}`, `{{ tresc }}`, `{{ autor }}`, `{{ typ }}`, `{{ data }}`, `{{ wiadomosc }}`
+*   **Wiadomości:** `{{ uczen }}`, `{{ nadawca }}`, `{{ temat }}`, `{{ data }}`, `{{ wiadomosc }}`
 
 *Przykład wiadomości:* `{{ uczen }} otrzymał ocenę {{ ocena }} z przedmiotu {{ przedmiot }}!`
 
@@ -904,7 +904,7 @@ odszukaj sekcję `entities` i zmień nazwę sensora.
         "exposeAsEntityConfig": "",
         "entities": {
             "entity": [
-                "sensor.vultron_plan_jan_kowalski" <-- TU WPISZ SWOJĄ ENCJE
+                "sensor.vultron_plan_jan_kowalski_curr" <-- TU WPISZ SWOJĄ ENCJE
                 moze byc tu druga encja w przypadku planu _curr,_next oraz ocen p1,p2
             ],
             "substring": [],

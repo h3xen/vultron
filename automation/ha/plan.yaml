@@ -15,8 +15,10 @@ actions:
         PRZEN: PRZENIESIONA 🕒
         NIEOB: NIEOBECNI 🚌
       today: "{{ now().strftime('%Y-%m-%d') }}"
-      old_lekcje: "{{ trigger.from_state.attributes.lekcje | default([]) }}"
+      old_lekcje: "{{ trigger.from_state.attributes.lekcje | default([]) if trigger.from_state else [] }}"
       new_lekcje: "{{ trigger.to_state.attributes.lekcje | default([]) }}"
+      # Przy zmianie tygodnia _curr dostaje tydzień, który _next już zgłosił.
+      pomin_nowy_tydzien: "{{ trigger.entity_id.endswith('_curr') }}"
 
       # Wyciąganie imienia: bierze tekst po ostatnim dwukropku
       uczen: >
@@ -26,14 +28,16 @@ actions:
       # Filtrowanie zmian
       zmiany: |
         {% set ns = namespace(items=[]) %}
+        {% set old_dates = old_lekcje | map(attribute='d') | list %}
         {% for n in new_lekcje %}
           {# Sprawdzamy tylko lekcje dzisiejsze i przyszłe #}
-          {% if n.d >= today and n.st != "" %}
+          {% if n.d >= today and n.st not in ["", "WLASNE"] %}
             {# Szukamy tej samej lekcji w starym stanie #}
             {% set o = old_lekcje | selectattr('d', 'eq', n.d) | selectattr('g', 'eq', n.g) | selectattr('p', 'eq', n.p) | first | default(none) %}
+            {% set juz_zgloszona = o is none and pomin_nowy_tydzien and n.d not in old_dates %}
 
             {# Jeśli status się zmienił lub lekcja dostała status, którego wcześniej nie było #}
-            {% if o is none or n.st != o.st %}
+            {% if (o is none or n.st != o.st) and not juz_zgloszona %}
               {% set status = status_map.get(n.st, n.st) %}
               {% set ns.items = ns.items + ["📅 " ~ n.d ~ " | ⏰ " ~ n.g ~ "\n📖 **" ~ n.p ~ "**\nStatus: " ~ status] %}
             {% endif %}

@@ -1,4 +1,21 @@
 ## 🧩 Changelog
+### **7.1.7 - Jungfru**
+- **Naprawa: automatyzacje i przepływy Node-RED** [#65](https://github.com/htomasz/vultron/issues/65)
+    - Plan: brak podwójnych powiadomień po zmianie tygodnia (`_curr` + `_next`); własne zajęcia z kalendarza HA nie są już zgłaszane jako zmiana planu.
+    - Oceny: poprawny semestr (wcześniej zawsze „2. semestr” lub `?`); w blueprincie `{{ data }}` ma rok (`20.10.2026`) — wcześniej daty z października pokazywały się jako `20.1`.
+    - Frekwencja: przykład `automation/ha/frekwencja.yaml` w ogóle nie wysyłał alertów — naprawione.
+    - Brak błędu `UndefinedError` w logach HA po restarcie (frekwencja, oraz przykłady planu, uwag i wiadomości).
+    - Przykłady `automation/ha/` i Node-RED: imię ucznia w powiadomieniu (wcześniej puste / „Uczeń”), ℹ️ dla wpisów informacyjnych.
+- **Naprawa: Node-RED**
+    - `frekwencja.json` działa także bez „Enable global context store” (wtedy bez nazwy przedmiotu); poprawna encja planu (`_curr`).
+    - `plan.json`: zgłasza zastępstwa z innym przedmiotem; nowe linie w treści, `notification_id` bez kropek, „dziś” w czasie lokalnym.
+    - `terminarz.json`, `uwagi.json`, `wiadomosci.json`: osobna pamięć dla każdego dziecka (przy kilku encjach w jednym węźle wpisy jednego dziecka wysyłały się ponownie); terminarz nie gubi pierwszego wpisu po okresie bez sprawdzianów; kartkówka z ikoną 📝.
+    - `patusek.json` przepisany na obecny format ocen (wcześniej kończył się błędem).
+    - Powiadomienia frekwencji i planu nie nadpisują się wzajemnie.
+- **Dokumentacja (README):** przykładowe encje z sufiksami (`_p1`, `_curr`), pełna lista zmiennych blueprintów (`okres`, `data`, `typ`).
+- **Uwaga:** zaimportowane blueprinty nie aktualizują się same — w HA: **Ustawienia → Automatyzacje i sceny → Blueprinty** → menu przy blueprincie → **Importuj ponownie** (Oceny, Zmiana Planu, Frekwencja). Przykłady z `automation/ha/` i `automation/node-red/` podmień ręcznie.
+- Dzięki [@elgatho](https://github.com/elgatho) za zgłoszenie.
+
 ### **7.1.6 - Jungfru**
 - **Naprawa: wiadomość ucznia szkoły pojawiała się też w wiadomościach przedszkolaka** — przy jednym koncie rodzica z uczniem szkoły i przedszkolakiem Vultron pobierał wiadomości przedszkolaka bez wskazania skrzynki, więc dostawał skrzynkę ucznia. Teraz pyta o skrzynkę przedszkolaka jawnie (tak jak dla uczniów szkół). **Uwaga:** wiadomość, która już trafiła do przedszkolaka, zostaje w bazie — usuń ją ręcznie (opis w README/FAQ lub zapytaj w zgłoszeniu).
 - **Naprawa: logowanie kończyło się błędem „element not interactable"** — eduVULCAN ma teraz pole hasła w kodzie strony od razu, ale ukryte do czasu kliknięcia „Dalej”, a Vultron wpisywał hasło, gdy tylko pole istniało. Teraz czeka, aż pole będzie widoczne. Jeśli mimo to się nie pojawi, zapisuje zrzut ekranu (`/local/vultron/vultron_auth_error.png`).
