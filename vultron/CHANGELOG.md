@@ -1,4 +1,7 @@
 ## 🧩 Changelog
+### **7.1.8 - Jungfru**
+- **Bezpieczeństwo:** przebudowa obrazu ze świeżymi pakietami Alpine (poprawki CVE w `curl` i `brotli`).
+
 ### **7.1.7 - Jungfru**
 - **Naprawa: automatyzacje i przepływy Node-RED** [#65](https://github.com/htomasz/vultron/issues/65)
     - Plan: brak podwójnych powiadomień po zmianie tygodnia (`_curr` + `_next`); własne zajęcia z kalendarza HA nie są już zgłaszane jako zmiana planu.
