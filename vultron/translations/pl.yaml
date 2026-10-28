@@ -17,3 +17,6 @@ configuration:
   test_mode:
     name: "Tryb testowy (Ignoruj harmonogram)"
     description: "Włączenie tej opcji sprawia, że skrypt całkowicie ignoruje nocne oraz weekendowe przerwy i pobiera dane w trybie ciągłym. Używaj tylko do testowania modyfikacji!"
+  messages_days:
+    name: "Wiadomości z ostatnich dni"
+    description: "Sensory wiadomości pokazują tylko wiadomości z tylu ostatnich dni, każdą z treścią (także przeczytane). 0 – bez filtra (10 najnowszych). Domyślnie: 2."

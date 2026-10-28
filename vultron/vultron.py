@@ -129,6 +129,12 @@ with open(OPTIONS_PATH, encoding="utf-8") as _f:
 
 _test_mode = CONFIG.get("test_mode", False)
 
+# Ile dni wstecz pokazywać wiadomości w sensorach (0 = bez filtra, ostatnie 10).
+try:
+    MESSAGES_DAYS = max(0, int(CONFIG.get("messages_days", 2)))
+except (TypeError, ValueError):
+    MESSAGES_DAYS = 2
+
 # ────────────────────────────────────────────────
 # USTAWIENIE DOCELOWEGO POZIOMU LOGOWANIA
 # ────────────────────────────────────────────────
@@ -1707,6 +1713,45 @@ def _fit_attr_list(items: list) -> tuple[list, int]:
         kept.append(item)
         size += item_size
     return kept, len(items) - len(kept)
+
+
+# Pojedyncza treść w sensorze: zapas, żeby kilka wiadomości zmieściło się
+# w ATTR_LIST_MAX_BYTES (polskie znaki to 2 B w UTF-8).
+MESSAGE_BODY_MAX_CHARS = 4000
+
+
+def _message_sensor_attrs(rows, unread: int, total: int, now: datetime | None = None) -> dict:
+    """Atrybuty sensora wiadomości z wierszy (data,nadawca,temat,tresc,przeczytana)
+    posortowanych od najnowszych. Pokazuje tylko wiadomości z ostatnich
+    MESSAGES_DAYS dni, każdą z treścią (także przeczytane); data nierozpoznana
+    = wiadomość zostaje (niepewność = nie ukrywaj)."""
+    cutoff = None
+    if MESSAGES_DAYS:
+        cutoff = (now or datetime.now()) - timedelta(days=MESSAGES_DAYS)
+    msgs = []
+    for r in rows:
+        data = (r[0] or "").replace("T", " ")[:16]
+        if cutoff is not None:
+            try:
+                if datetime.strptime(data, "%Y-%m-%d %H:%M") < cutoff:
+                    continue
+            except ValueError:
+                pass
+        body = clean_html(r[3])
+        if len(body) > MESSAGE_BODY_MAX_CHARS:
+            body = body[:MESSAGE_BODY_MAX_CHARS - 3] + "..."
+        msgs.append({
+            "data":        data,
+            "nadawca":     r[1] or "",
+            "temat":       r[2] or "",
+            "tresc":       body,
+            "przeczytana": int(r[4]) != 0,
+        })
+    msgs, pominiete = _fit_attr_list(msgs)
+    attrs = {"wiadomosci": msgs, "stats": f"{unread} / {total}"}
+    if pominiete:
+        attrs["pominiete"] = pominiete
+    return attrs
 
 
 def _delete_missing(cur, table: str, id_col: str, slug: str, keep_ids: set,
@@ -3336,29 +3381,11 @@ def _fetch_przedszkole_wiadomosci(s: dict) -> None:
                 conn.close()
                 conn = None
 
-        # Treść (może być duża) publikujemy tylko dla nieprzeczytanych, oczyszczoną
-        # i do 2000 znaków, żeby nie przekroczyć limitu atrybutów HA (16384 B).
-        msgs = []
-        for r in rows:
-            is_unread = int(r[4]) == 0
-            body = ""
-            if is_unread:
-                body = clean_html(r[3])
-                if len(body) > 2000:
-                    body = body[:1997] + "..."
-            msgs.append({
-                "data":        (r[0] or "").replace("T", " ")[:16],
-                "nadawca":     r[1] or "",
-                "temat":       r[2] or "",
-                "tresc":       body,
-                "przeczytana": not is_unread,
-            })
-
         publish_sensor_sync(
             f"sensor.vultron_przedszkole_wiadomosci_{slug}",
             unread,
             f"Wiadomości (przedszkole): {name}",
-            {"wiadomosci": msgs, "stats": f"{unread} / {total}"},
+            _message_sensor_attrs(rows, unread, total),
         )
 
     finally:
@@ -4077,27 +4104,11 @@ def run_messages_sync(students_list: list) -> None:
                         (slug,),
                     ).fetchone()[0]
 
-                    msgs = []
-                    for r in rows:
-                        is_u = int(r[4]) == 0
-                        body = ""
-                        if is_u:
-                            body = clean_html(r[3])
-                            if len(body) > 2000:
-                                body = body[:1997] + "..."
-                        msgs.append({
-                            "data":        (r[0] or "").replace("T", " ")[:16],
-                            "nadawca":     r[1] or "",
-                            "temat":       r[2] or "",
-                            "tresc":       body,
-                            "przeczytana": not is_u,
-                        })
-
                     sensor_payloads.append((
                         f"sensor.vultron_wiadomosci_{slug}",
                         unread,
                         f"Wiadomości: {st['uczen']}",
-                        {"wiadomosci": msgs, "stats": f"{unread} / {total}"},
+                        _message_sensor_attrs(rows, unread, total),
                     ))
             finally:
                 conn.close()
