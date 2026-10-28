@@ -1,5 +1,6 @@
 ## 🧩 Changelog
-### **Niewydane**
+### **7.1.9 - Jungfru (fork h3xen)**
+- **Fork:** wersja z repozytorium [h3xen/vultron](https://github.com/h3xen/vultron), poprawka [@h3xen](https://github.com/h3xen); oryginał: [htomasz/vultron](https://github.com/htomasz/vultron).
 - **Wiadomości: tylko świeże, z treścią** — sensory `sensor.vultron_wiadomosci_*` i `sensor.vultron_przedszkole_wiadomosci_*` pokazują tylko wiadomości z ostatnich 2 dni (nowa opcja `messages_days`, `0` = jak dotąd 10 najnowszych). Treść jest teraz także w przeczytanych wiadomościach (do 4000 znaków); jeśli całość nie mieści się w limicie atrybutów HA, najstarsze są pomijane (atrybut `pominiete`). Stan sensora i `stats` nadal liczą wszystkie wiadomości.
 
 ### **7.1.8 - Jungfru**

@@ -1,3 +1,6 @@
+> [!NOTE]
+> **Fork [h3xen/vultron](https://github.com/h3xen/vultron)** projektu [htomasz/vultron](https://github.com/htomasz/vultron). Poprawka h3xen: sensory wiadomości pokazują tylko wiadomości z ostatnich dni (opcja `messages_days`, domyślnie 2), każdą z treścią — także przeczytane. W HA dodatek widnieje jako **„Vultron (h3xen)”**. Repozytorium dodatków: `https://github.com/h3xen/vultron`
+
 ![GitHub release](https://img.shields.io/github/v/release/htomasz/vultron?style=flat-square)
 ![GitHub last commit](https://img.shields.io/github/last-commit/htomasz/vultron?style=flat-square&logo=git&logoColor=white)
 ![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg?style=flat-square)

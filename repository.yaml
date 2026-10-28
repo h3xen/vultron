@@ -1,4 +1,4 @@
-name: "Vultron Add-ons"
-url: "https://github.com/htomasz/vultron"
-maintainer: "Tomasz H. <https://github.com/htomasz>"
+name: "Vultron Add-ons (fork h3xen)"
+url: "https://github.com/h3xen/vultron"
+maintainer: "h3xen <https://github.com/h3xen> (fork projektu Tomasz H. <https://github.com/htomasz>)"
 description: "Integracja EduVulcan dla Home Assistant"
