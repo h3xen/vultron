@@ -1,8 +1,10 @@
 # 🧩 Changelog
-## **7.2.1 - Garn (fork h3xen)**
+## **7.2.2 - Garn (fork h3xen)** — 2026-11-08
 - **Fork:** wersja z repozytorium [h3xen/vultron](https://github.com/h3xen/vultron), poprawka [@h3xen](https://github.com/h3xen); oryginał: [htomasz/vultron](https://github.com/htomasz/vultron). Zawiera wszystkie zmiany oryginału do 7.2.1 włącznie.
 - **Wiadomości: tylko świeże, z treścią** — sensory `sensor.vultron_wiadomosci_*` i `sensor.vultron_przedszkole_wiadomosci_*` pokazują tylko wiadomości z ostatnich 2 dni (opcja `messages_days`, `0` = jak w oryginale 10 najnowszych). Treść jest także w przeczytanych wiadomościach (do 4000 znaków); jeśli całość nie mieści się w limicie atrybutów HA, najstarsze są pomijane (atrybut `pominiete`). Stan sensora i `stats` nadal liczą wszystkie wiadomości.
 - **Opcja `refresh_minutes`** — co ile minut dodatek pobiera dane z dziennika (domyślnie 40, zakres 15-1440; do wartości dodawany jest losowy odstęp do połowy jej wartości, więc domyślnie nadal 40-60 min). Dotyczy eduVULCAN i GPE; nocne i weekendowe przerwy z harmonogramu bez zmian.
+- **CI forka: obraz do własnego GHCR** — workflowy budowania, wydania i skanu Trivy wypychają i skanują obraz `ghcr.io/<właściciel repo>/vultron` zamiast wpisanego na stałe `ghcr.io/htomasz/vultron` (błąd `permission_denied` na forkach).
+- **Plan lekcji (karta)**: style w jednym bloku CSS ze zmiennymi `--vp-*` (skala, nagłówek, kolumna godzin, kafelki), plakietki statusu w prawym górnym rogu kafelka, numer wersji karty w konsoli i atrybucie `data-version`.
 
 ## **7.2.1 - Garn** — 2026-11-07
 - **Naprawa: encja znikała po restarcie Home Assistanta** — encja, której dane nie zmieniły się przez 60 dni (np. uwagi bez nowych wpisów), była usuwana z lokalnej kopii używanej do odtwarzania po restarcie HA. Po restarcie HA nie było jej czym odtworzyć, a kolejne cykle jej nie wysyłały, bo dane się nie zmieniły. Encja wracała dopiero po zmianie danych albo restarcie dodatku. Teraz po wykryciu restartu HA następny cykl publikuje wszystkie encje. Dotyczy eduVULCAN i GPE Gdańsk.

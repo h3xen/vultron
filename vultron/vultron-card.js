@@ -2,7 +2,7 @@
 
 // Wersja karty - podbijaj przy każdej zmianie pliku, żeby w konsoli przeglądarki
 // (F12) od razu widać było, czy Home Assistant załadował nowy plik, a nie cache.
-const VULTRON_CARD_VERSION = '7.2.1-h3xen.1';
+const VULTRON_CARD_VERSION = '7.2.2-h3xen.1';
 
 class VultronPlanCard extends HTMLElement {
   constructor() {

@@ -1,6 +1,6 @@
 name: Build image
 
-# Buduje obraz ghcr.io/htomasz/vultron:<wersja> dla samodzielnego kontenera
+# Buduje obraz ghcr.io/<właściciel repo>/vultron:<wersja> dla samodzielnego kontenera
 # (compose.yaml), zanim powstanie wydanie z taga. Dodatek HA z niego NIE
 # korzysta (brak image: w config.yaml) - buduje się lokalnie.
 #
@@ -28,7 +28,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/htomasz/vultron
+  # Właściciel bieżącego repo (fork wypycha do własnego GHCR, nie do htomasz).
+  # GHCR wymaga małych liter - nazwa konta/organizacji musi być lowercase.
+  IMAGE: ghcr.io/${{ github.repository_owner }}/vultron
 
 jobs:
   check:

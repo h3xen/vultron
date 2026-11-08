@@ -1,7 +1,7 @@
 name: "Vultron (h3xen)"
 description: "Fork h3xen: wiadomości z ostatnich dni z treścią. Oryginał: github.com/htomasz/vultron"
 url: "https://github.com/h3xen/vultron"
-version: "7.2.1"
+version: "7.2.2"
 slug: "vultron"
 panel_icon: "mdi:school"
 homeassistant: ">=2024.12.0"

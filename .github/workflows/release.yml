@@ -82,7 +82,7 @@ jobs:
           zip -r "../vultron-$VER.zip" .
 
       # Podpisana provenance (SLSA, Sigstore): dowód, że zip zbudowało CI
-      # z tego repo. Weryfikacja: gh attestation verify vultron-X.zip -R htomasz/vultron
+      # z tego repo. Weryfikacja: gh attestation verify vultron-X.zip -R <właściciel>/vultron
       - name: Podpisz zip (build provenance)
         id: attest
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -132,7 +132,7 @@ jobs:
       id-token: write       # podpis Sigstore (gdy budujemy tutaj)
       attestations: write   # zapis attestation (gdy budujemy tutaj)
     env:
-      IMAGE: ghcr.io/htomasz/vultron
+      IMAGE: ghcr.io/${{ github.repository_owner }}/vultron
       VER: ${{ needs.verify.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

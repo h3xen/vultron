@@ -61,7 +61,7 @@ Konta GPE Gdańsk mogą korzystać z opcjonalnego dostawcy `gdansk`. Konfiguracj
 - [@KamillJot](https://github.com/KamillJot) — wsparcie dla [GPE Gdańsk](GDANSK.md)
 
 ##
- **Wersja:** 7.2.1 \
+ **Wersja:** 7.2.2 \
 **Nazwa Kodowa:** [Garn](https://en.wikipedia.org/wiki/Space_adaptation_syndrome#:~:text=Garn%20scale) 🚀🚀
 
 
