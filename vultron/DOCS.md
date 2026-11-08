@@ -21,7 +21,9 @@ Karty JavaScript dodatek rejestruje w zasobach Lovelace sam, przy każdym starci
 | `username` | eduVULCAN: adres e-mail. GPE Gdańsk: login konta podany przy rejestracji. | — |
 | `password` | Hasło do dziennika. | — |
 | `log_level` | `info`, `debug` albo `trace`. `trace` zapisuje do logu pełne odpowiedzi dziennika (oceny, uwagi, treści wiadomości): używaj tylko do diagnozy i wyłącz po niej. | `info` |
-| `test_mode` | Pomija przerwy z harmonogramu (nocne i weekendowe godziny pobierania). Odstęp 40-60 minut między pobraniami zostaje. Tylko do testów. | `false` |
+| `test_mode` | Pomija przerwy z harmonogramu (nocne i weekendowe godziny pobierania). Odstęp między pobraniami (`refresh_minutes`) zostaje. Tylko do testów. | `false` |
+| `messages_days` | Sensory wiadomości pokazują tylko wiadomości z tylu ostatnich dni, każdą z treścią. `0` – bez filtra (10 najnowszych). | `2` |
+| `refresh_minutes` | Co ile minut pobierać dane z dziennika (15-1440). Do tej wartości dodawany jest losowy odstęp do połowy jej wartości, np. `40` daje 40-60 min. Nocne i weekendowe przerwy z harmonogramu zostają. Zbyt częste logowania mogą wywołać CAPTCHA lub blokadę konta. | `40` |
 
 ## Kiedy dodatek się zatrzymuje
 

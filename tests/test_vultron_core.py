@@ -78,6 +78,17 @@ def _insert(conn, table, values_by_col):
 
 # ── proste funkcje pomocnicze ──────────────────────────────────────────────
 
+@pytest.mark.parametrize(("minutes", "low", "high"), [
+    (40, 2400, 3600),      # domyślnie jak dawniej: 40-60 min
+    (15, 900, 1350),       # minimum
+    (120, 7200, 10800),
+])
+def test_poll_interval_seconds(v, monkeypatch, minutes, low, high):
+    monkeypatch.setattr(v, "REFRESH_MINUTES", minutes)
+    for _ in range(200):
+        assert low <= v._poll_interval_seconds() <= high
+
+
 def test_slugify(v):
     assert v.slugify("Zażółć Gęślą Jaźń") == "zazolc_gesla_jazn"
     assert v.slugify("  Jan-Kowalski 2b ") == "jan_kowalski_2b"

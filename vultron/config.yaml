@@ -19,6 +19,7 @@ options:
   log_level: "info"
   test_mode: false
   messages_days: 2
+  refresh_minutes: 40
 schema:
   provider: list(eduvulcan|gdansk)
   student_name: str?
@@ -27,3 +28,4 @@ schema:
   log_level: list(info|debug|trace)
   test_mode: bool
   messages_days: int(0,365)?
+  refresh_minutes: int(15,1440)?

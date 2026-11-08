@@ -144,6 +144,20 @@ try:
 except (TypeError, ValueError):
     MESSAGES_DAYS = 2
 
+# Odstęp między pobraniami danych (minuty). Min. 15: częstsze logowania grożą
+# CAPTCHA i blokadą konta.
+try:
+    REFRESH_MINUTES = min(1440, max(15, int(CONFIG.get("refresh_minutes", 40))))
+except (TypeError, ValueError):
+    REFRESH_MINUTES = 40
+
+
+def _poll_interval_seconds() -> int:
+    """Odstęp do następnego pobrania: baza + losowo do połowy bazy (40 min -> 40-60 min)."""
+    base = REFRESH_MINUTES * 60
+    return base + secrets.randbelow(base // 2 + 1)
+
+
 # ────────────────────────────────────────────────
 # USTAWIENIE DOCELOWEGO POZIOMU LOGOWANIA
 # ────────────────────────────────────────────────
@@ -4602,7 +4616,7 @@ async def gdansk_main_loop() -> None:
                     await publish_sensor(ha, "sensor.vultron_gdansk_status", "error",
                                          "Vultron Gdańsk – synchronizacja", {"error": safe_error})
                 await _run_size_monitor(ha)
-                delay = 2400 + secrets.randbelow(1201) + min(failures * 600, 3600)
+                delay = _poll_interval_seconds() + min(failures * 600, 3600)
                 logger.info("[GPE] Następny odczyt za około %d minut", delay // 60)
             for elapsed in range(0, delay, 10):
                 try:
@@ -4854,13 +4868,13 @@ async def main_loop() -> None:
                     logger.info("%s (Niedziela) → następne pobieranie o %s (za ~%d min)", cykl, wake_at.strftime("%H:%M"), wait_time // 60)
 
                 else:
-                    # 40-60 min z losowym rozrzutem
-                    wait_time = 2400 + secrets.randbelow(1201)
+                    # REFRESH_MINUTES (domyślnie 40) + losowy rozrzut
+                    wait_time = _poll_interval_seconds()
                     next_run = now_after + timedelta(seconds=wait_time)
                     logger.info("%s → następny za ~%d min (o %s)", cykl, wait_time // 60, next_run.strftime("%H:%M"))
             else:
                 # j.w.
-                wait_time = 2400 + secrets.randbelow(1201)
+                wait_time = _poll_interval_seconds()
                 next_run = now_after + timedelta(seconds=wait_time)
                 logger.info("[TEST MODE] %s → następny za ~%d min (o %s)", cykl, wait_time // 60, next_run.strftime("%H:%M"))
 

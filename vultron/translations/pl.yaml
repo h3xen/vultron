@@ -20,3 +20,6 @@ configuration:
   messages_days:
     name: "Wiadomości z ostatnich dni"
     description: "Sensory wiadomości pokazują tylko wiadomości z tylu ostatnich dni, każdą z treścią (także przeczytane). 0 – bez filtra (10 najnowszych). Domyślnie: 2."
+  refresh_minutes:
+    name: "Sprawdzanie danych co ile minut"
+    description: "Co ile minut pobierać dane z dziennika (do tego czasu dodawany jest losowy odstęp do połowy tej wartości, np. 40 daje 40-60 min). Minimum 15 – zbyt częste logowania mogą wywołać CAPTCHA lub blokadę konta. Nocne i weekendowe przerwy z harmonogramu zostają. Domyślnie: 40."
