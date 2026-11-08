@@ -5,9 +5,15 @@ on: [push, pull_request,workflow_dispatch]
 permissions:
   contents: read
 
+# Nowy push do tej samej gałęzi anuluje poprzedni, niedokończony przebieg.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   hadolint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -18,4 +24,5 @@ jobs:
           # Naprawiona ścieżka do Twojego Dockerfile
           dockerfile: vultron/Dockerfile
           # Ignorujemy błędy wersji paczek, żeby nie "zaśmiecać" wyniku
-          ignore: DL3007,DL3018,DL3008,DL3013
+          # DL3007 (FROM ...:latest) nie jest ignorowany: baza jest przypięta.
+          ignore: DL3018,DL3008,DL3013

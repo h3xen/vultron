@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 class VultronWorkCard extends HTMLElement {
   constructor() {
     super();
@@ -183,7 +184,9 @@ class VultronWorkCard extends HTMLElement {
   renderBody(state) {
     let lista = [...state.attributes.lista];
 
-    const today = new Date().toISOString().split('T')[0];
+    // Data lokalna (toISOString() daje UTC, czyli po północy jeszcze wczoraj).
+    const _now = new Date();
+    const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`;
     lista = lista.filter(i => i.data >= today);
 
     lista.sort((a, b) => {
@@ -207,7 +210,7 @@ class VultronWorkCard extends HTMLElement {
         if (isT) bc = "#f44336";
         if (isQ) bc = "#ff9800";
 
-        const shortDesc = i.opis.length > 80 ? i.opis.substring(0, 100) + '...' : i.opis;
+        const shortDesc = i.opis.length > 100 ? i.opis.substring(0, 100) + '...' : i.opis;
         const displayDate = i.data || '—';
 
         html += `

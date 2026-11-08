@@ -40,7 +40,7 @@ Vultron dotyka danych Twoich dzieci i Twojego konta. Zanim cokolwiek wkleisz pub
 3. Uruchom testy (te same co w CI):
 
    ```bash
-   pip install -r vultron/requirements.txt pytest
+   pip install --require-hashes -r vultron/requirements.txt -r .github/requirements/tests.txt
    python -m pytest -q tests
    node --test tests/*.cjs
    ```
@@ -51,6 +51,18 @@ Vultron dotyka danych Twoich dzieci i Twojego konta. Zanim cokolwiek wkleisz pub
 
 Wersje i wydania robi opiekun, więc w PR nie zmieniaj numeru wersji.
 
+### Wydanie (opiekun)
+
+1. Podbij wersję w trzech miejscach: `vultron/config.yaml`, `io.hass.version` w `vultron/Dockerfile`,
+   `**Wersja:**` w `README.md`. `release.yml` przerwie wydanie, jeśli się różnią.
+   W `vultron/CHANGELOG.md` dodaj sekcję z nagłówkiem `## **X.Y.Z - Nazwa** — RRRR-MM-DD`.
+   Jej treść trafia do opisu GitHub Release; bez niej opis wygeneruje GitHub.
+2. Merge do `main` i `git push`. Push z niewydaną wersją sam uruchamia **Build image**: obraz w GHCR
+   dla amd64 i aarch64 (dla samodzielnego kontenera, `compose.yaml`), podpis i skan Trivy.
+   Dodatek HA nie korzysta z tego obrazu - buduje się lokalnie z `vultron/Dockerfile`.
+3. Tag `X.Y.Z` na `main` i `git push origin X.Y.Z`. **Release** publikuje zip z podpisem i ustawia
+   obraz `:latest` (gotowy z kroku 2 albo zbudowany na miejscu).
+
 ## Gdzie co leży
 
 | Plik / katalog | Co to jest |
@@ -58,7 +70,8 @@ Wersje i wydania robi opiekun, więc w PR nie zmieniaj numeru wersji.
 | `vultron/vultron.py` | Główny dodatek: logowanie Selenium, pobieranie z eduVULCAN, encje w HA. |
 | `vultron/gdansk.py` | Dostawca GPE Gdańsk, osobna ścieżka logowania. |
 | `vultron/vultron-*.js` | Karty Lovelace. |
-| `vultron/Dockerfile` | Obraz na `alpine:latest`. Tak, celowo `latest`. |
+| `vultron/Dockerfile` | Obraz na przypiętym Alpine (wersja + digest). Podbija go Dependabot. |
+| `vultron/requirements.in` / `requirements.txt` | Zależności Pythona: `.in` to lista główna, `.txt` pełna lista z hashami (generowana z `.in`). |
 | `tests/` | Testy Pythona i kart. |
 
 ## Zasady, których się trzymamy

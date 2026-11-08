@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from __future__ import annotations
 import asyncio
 import ctypes
@@ -93,6 +94,14 @@ logging.getLogger("selenium").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+# /data (options.json z hasłem, vul.pkl = aktywna sesja, baza, log) tylko dla
+# właściciela. W Dockerze ./data na hoście nie jest wtedy dostępne dla innych
+# użytkowników, także dla plików utworzonych przed tą zmianą.
+try:
+    os.chmod("/data", 0o700)
+except OSError as _e:
+    logger.warning("Nie udało się ograniczyć uprawnień /data: %s", _e)
 
 # ────────────────────────────────────────────────
 # WERYFIKACJA ŚRODOWISKA HA
@@ -433,8 +442,8 @@ def _save_to_cache(entity_id: str, state, attrs: dict) -> None:
                 try:
                     if _cache_conn is not None:
                         _cache_conn.close()
-                except Exception:
-                    pass
+                except Exception as close_err:
+                    logger.debug("Błąd zamykania połączenia ha_cache: %s", close_err)
                 _cache_conn = None
                 if attempt == 1:
                     logger.error("Błąd zapisu do ha_cache dla %s: %s", entity_id, e)
@@ -576,9 +585,14 @@ async def check_and_restore(ha: httpx.AsyncClient) -> None:
         r = await ha.get(f"{HA_URL}/states/sensor.vultron_system_monitor", timeout=4)
         if r.status_code == 404:
             logger.warning("Wykryto restart Home Assistanta! Wstrzykuję stan z bazy...")
+            # Encji, której nie ma w ha_cache (retencja) albo której odtworzenie się nie
+            # udało, HA już nie zna, a jej hash blokowałby publikację do zmiany danych.
+            # Odtworzone encje dostają hash z powrotem w restore_entities_from_cache.
+            with _sent_hashes_lock:
+                _sent_hashes.clear()
             await restore_entities_from_cache(ha)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Sprawdzenie restartu HA nieudane: %s", e)
 
 
 # ────────────────────────────────────────────────
@@ -788,8 +802,8 @@ def _get_driver() -> webdriver.Chrome:
         # Proces już wystartował, więc trzeba go zamknąć, inaczej zostanie zombie.
         try:
             driver.quit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("[AUTH] Zignorowano błąd przy zamykaniu przeglądarki: %s", e)
         _hard_kill_service(service)
         raise
     return driver
@@ -1012,8 +1026,8 @@ async def wait_for_ha_api() -> None:
                 if r.status_code == 200:
                     logger.info("HA API gotowe.")
                     return
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("HA API jeszcze niedostępne: %s", e)
             logger.info("Czekam na HA API…")
             await asyncio.sleep(5)
 
@@ -1038,8 +1052,8 @@ def run_setup_ui() -> None:
             if ws is not None:
                 try:
                     ws.close()
-                except Exception:
-                    pass
+                except Exception as close_err:
+                    log.debug("Błąd zamykania WebSocket: %s", close_err)
                 ws = None
             if attempt < 9:
                 log.info("Czekam na WS… (%d/10)", attempt + 1)
@@ -1222,7 +1236,9 @@ def run_diary_auth() -> tuple[list | None, list | None, list | None]:
                                 try:
                                     if fr.is_displayed():
                                         return True
-                                except Exception:
+                                except Exception as e:
+                                    # Wołane co ~0,5 s przez WebDriverWait - tylko TRACE.
+                                    logger.trace("[AUTH] iframe niedostępny (pomijam): %s", e)
                                     continue
                             return False
 
@@ -1279,8 +1295,8 @@ def run_diary_auth() -> tuple[list | None, list | None, list | None]:
                                 # Zawsze wracamy do głównej zawartości
                                 try:
                                     driver.switch_to.default_content()
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    logger.debug("[AUTH] Nie udało się wrócić z iframe: %s", e)
 
                         time.sleep(1.0)  # krótka pauza po obsłudze wszystkich ramek
 
@@ -1288,8 +1304,8 @@ def run_diary_auth() -> tuple[list | None, list | None, list | None]:
                         logger.warning("[AUTH] Błąd przy akceptacji ciasteczek: %s", e)
                         try:
                             driver.switch_to.default_content()
-                        except Exception:
-                            pass
+                        except Exception as e2:
+                            logger.debug("[AUTH] Nie udało się wrócić z iframe: %s", e2)
                     # -------------------------------------
 
                     # Strona się załadowała - koniec prób
@@ -1309,11 +1325,26 @@ def run_diary_auth() -> tuple[list | None, list | None, list | None]:
                     raise
 
             def _save_error_screenshot() -> str:
-                err_dir = "/config/www/vultron"
-                os.makedirs(err_dir, exist_ok=True)
-                err_path = os.path.join(err_dir, "vultron_auth_error.png")
-                driver.save_screenshot(err_path)
-                return err_path
+                # /local/ jest dostępne bez logowania, więc nazwa jest losowa
+                # (podana tylko w logu), a poprzednie zrzuty są usuwane.
+                # Błąd zrzutu nie może podmienić wyjątku wołającego (np. LoginRejected).
+                try:
+                    err_dir = "/config/www/vultron"
+                    os.makedirs(err_dir, exist_ok=True)
+                    for old in os.listdir(err_dir):
+                        if old.startswith("vultron_auth_error") and old.endswith(".png"):
+                            try:
+                                os.remove(os.path.join(err_dir, old))
+                            except OSError as e:
+                                logger.debug("[AUTH] Nie usunięto starego zrzutu %s: %s", old, e)
+                    err_name = f"vultron_auth_error_{secrets.token_urlsafe(16)}.png"
+                    err_path = os.path.join(err_dir, err_name)
+                    if not driver.save_screenshot(err_path):
+                        return "(nie udało się zapisać zrzutu)"
+                    return f"{err_path} (w przeglądarce: /local/vultron/{err_name})"
+                except Exception as e:
+                    logger.debug("[AUTH] Zrzut ekranu nieudany: %s", e)
+                    return "(nie udało się zapisać zrzutu)"
 
             # Wpisanie loginu (tylko jeśli formularz jest widoczny)
             credentials_sent = False
@@ -1390,7 +1421,6 @@ def run_diary_auth() -> tuple[list | None, list | None, list | None]:
                     "strony (nowa/stara/historyczna) nie pasował. Zrzut ekranu zapisano w: %s",
                     err_path,
                 )
-                logger.error("[AUTH] Sprawdź błąd wpisując: http://<TWOJE_IP_HA>:8123/local/vultron/vultron_auth_error.png")
                 raise last_exc if last_exc is not None else RuntimeError("Nie znaleziono kafelka dziennika")
 
             logger.info("[AUTH] Znaleziono %d kafelek/kafelków dziennika (wersja strony: %s).",
@@ -1754,14 +1784,59 @@ def _message_sensor_attrs(rows, unread: int, total: int, now: datetime | None = 
     return attrs
 
 
+def _fit_messages(msgs: list) -> tuple[list, int]:
+    """Wiadomości do atrybutu sensora w limicie ATTR_LIST_MAX_BYTES. Lista
+    zostaje cała (automatyzacje porównują nagłówki: skrócenie listy dałoby
+    fałszywe "nowe" wiadomości), a treść jest czyszczona od najstarszych.
+    Zwraca (lista, liczba_wyczyszczonych_treści)."""
+    def _size() -> int:
+        return len(json.dumps(msgs, ensure_ascii=False).encode("utf-8"))
+    skrocone = 0
+    for m in reversed(msgs):  # lista od najnowszych
+        if _size() <= ATTR_LIST_MAX_BYTES:
+            break
+        if m.get("tresc"):
+            m["tresc"] = ""
+            skrocone += 1
+    return msgs, skrocone
+
+
+# Zapytania _delete_missing jako stałe: SQLite nie przyjmuje nazw tabel i
+# kolumn jako parametrów "?", a SQL sklejany w locie wymagałby wyłączenia
+# skanerów (bandit B608 / ruff S608). Nowa para (tabela, kolumna id) = nowy wpis.
+_DELETE_MISSING_SQL: dict[tuple[str, str], tuple[str, str]] = {
+    ("free_days", "data"): (
+        "SELECT data, data FROM free_days WHERE student_slug=?",
+        "DELETE FROM free_days WHERE student_slug=? AND data=?",
+    ),
+    ("timetable", "id"): (
+        "SELECT id, data FROM timetable WHERE student_slug=?",
+        "DELETE FROM timetable WHERE student_slug=? AND id=?",
+    ),
+    ("remarks", "remark_id"): (
+        "SELECT remark_id, data FROM remarks WHERE student_slug=?",
+        "DELETE FROM remarks WHERE student_slug=? AND remark_id=?",
+    ),
+    ("meetings", "id"): (
+        "SELECT id, data FROM meetings WHERE student_slug=?",
+        "DELETE FROM meetings WHERE student_slug=? AND id=?",
+    ),
+    ("przedszkole_zebrania", "id"): (
+        "SELECT id, data FROM przedszkole_zebrania WHERE student_slug=?",
+        "DELETE FROM przedszkole_zebrania WHERE student_slug=? AND id=?",
+    ),
+}
+
+
 def _delete_missing(cur, table: str, id_col: str, slug: str, keep_ids: set,
                     date_from: str | None = None, date_to: str | None = None) -> int:
     """Usuwa wiersze ucznia skasowane w dzienniku: nieobecne w odpowiedzi API, ale
     tylko w zakresie dat tej odpowiedzi (starsze wpisy zostają). Wiersz z datą
     nierozpoznaną zostaje (niepewność = nie kasuj).
-    table/id_col to stałe z kodu, nigdy dane z zewnątrz."""
+    Para (table, id_col) musi być w _DELETE_MISSING_SQL (inaczej KeyError)."""
+    select_sql, delete_sql = _DELETE_MISSING_SQL[(table, id_col)]
     stale = []
-    for rid, raw in cur.execute(f"SELECT {id_col}, data FROM {table} WHERE student_slug=?", (slug,)).fetchall():  # noqa: S608 # nosec B608
+    for rid, raw in cur.execute(select_sql, (slug,)).fetchall():
         if rid in keep_ids:
             continue
         day = _normalize_date_prefix(raw)
@@ -1769,7 +1844,7 @@ def _delete_missing(cur, table: str, id_col: str, slug: str, keep_ids: set,
             continue
         stale.append((slug, rid))
     if stale:
-        cur.executemany(f"DELETE FROM {table} WHERE student_slug=? AND {id_col}=?", stale)  # noqa: S608 # nosec B608
+        cur.executemany(delete_sql, stale)
     return len(stale)
 
 
@@ -2120,8 +2195,10 @@ async def _fetch_schedule(client: httpx.AsyncClient, ha: httpx.AsyncClient,
                 godz_od    = lesson.get("godzinaOd", "T00:00")
                 godz_do    = lesson.get("godzinaDo", "T00:00")
                 # Domyślna wartość chroni tylko przed brakiem klucza; wartość bez "T"
-                # dałaby IndexError w split("T")[1], więc pomijamy taką lekcję.
-                if "T" not in godz_od or "T" not in godz_do:
+                # dałaby IndexError w split("T")[1], a null (None) TypeError, który
+                # przerwałby cały plan - więc pomijamy tylko taką lekcję.
+                if (not isinstance(godz_od, str) or not isinstance(godz_do, str)
+                        or "T" not in godz_od or "T" not in godz_do):
                     logger.warning(
                         "[%s] pominięto lekcję - nieoczekiwany format godzin (od=%r, do=%r)",
                         name, godz_od, godz_do,
@@ -2171,7 +2248,7 @@ async def _fetch_schedule(client: httpx.AsyncClient, ha: httpx.AsyncClient,
             free_to_insert: list[tuple] = []
             for fd in _free_days:
                 wszystkie = fd.get("wszystkieSkladowe", False)
-                jednostki = fd.get("jednostkiSkladowe", [])
+                jednostki = fd.get("jednostkiSkladowe") or []  # null = brak jednostek
                 valid = wszystkie
                 if not valid:
                     for j in jednostki:
@@ -2254,19 +2331,21 @@ async def _fetch_timetable(client: httpx.AsyncClient, ha: httpx.AsyncClient,
 
     items = res.json()
 
-    # _detail robi zapytanie HTTP, więc działa poza db_lock; zwraca wiersz, a zapis
-    # idzie jednym executemany pod krótkim lockiem.
-    async def _detail(item: dict) -> tuple | None:
+    # _detail robi zapytanie HTTP, więc działa poza db_lock; zwraca (szczegóły
+    # pobrane?, wiersz), a zapis idzie jednym executemany pod krótkim lockiem.
+    async def _detail(item: dict) -> tuple[bool, tuple] | None:
         item_id = item.get("id")
         if not item_id:
             return None
         ep = "ZadanieDomoweSzczegoly" if item.get("typ") == 4 else "SprawdzianSzczegoly"
 
         dj = {}
+        szczegoly = False
         try:
             dr = await client.get(f"{base}/api/{ep}", params={"key": key, "id": item_id})
             if dr.status_code == 200:
                 dj = dr.json()
+                szczegoly = True
         except httpx.RequestError as exc:
             logger.warning("[%s] błąd szczegółów terminarza %s: %s", name, item_id, exc)
 
@@ -2291,22 +2370,27 @@ async def _fetch_timetable(client: httpx.AsyncClient, ha: httpx.AsyncClient,
         przedmiot = dj.get("przedmiotNazwa") or item.get("przedmiotNazwa", "")
         autor = dj.get("nauczycielImieNazwisko") or item.get("nauczycielImieNazwisko", "")
 
-        return (str(item_id), slug, data,
-                przedmiot,
-                MAPA_TYP_TERMINARZA.get(item.get("typ"), "Inne"),
-                czysty_opis,
-                autor)
+        return szczegoly, (str(item_id), slug, data,
+                           przedmiot,
+                           MAPA_TYP_TERMINARZA.get(item.get("typ"), "Inne"),
+                           czysty_opis,
+                           autor)
 
     detail_results = await asyncio.gather(
         *[_detail(i) for i in items], return_exceptions=True
     )
     rows_to_insert: list[tuple] = []
+    # Bez szczegółów (błąd sieci, odpowiedź inna niż 200) mamy tylko dane z listy,
+    # często bez opisu. Taki wiersz zapisujemy tylko dla nowego wpisu - istniejący
+    # zostaje, inaczej opis zmieniałby się na "Brak opisu" i z powrotem, a
+    # automatyzacje zgłaszałyby to jako nowe wpisy.
+    rows_from_list: list[tuple] = []
     for r in detail_results:
         if isinstance(r, Exception):
             logger.warning("[%s] błąd pozycji terminarza: %s", name, r)
             continue
         if r is not None:
-            rows_to_insert.append(r)
+            (rows_to_insert if r[0] else rows_from_list).append(r[1])
 
     async with db_lock:
         conn = db_connect()
@@ -2316,6 +2400,11 @@ async def _fetch_timetable(client: httpx.AsyncClient, ha: httpx.AsyncClient,
                 cur.executemany(
                     "INSERT OR REPLACE INTO timetable VALUES (?,?,?,?,?,?,?)",
                     rows_to_insert,
+                )
+            if rows_from_list:
+                cur.executemany(
+                    "INSERT OR IGNORE INTO timetable VALUES (?,?,?,?,?,?,?)",
+                    rows_from_list,
                 )
             # Odwołany sprawdzian/zadanie znika. Id bierzemy z listy z API (nie ze
             # szczegółów), żeby błąd szczegółów nie kasował wpisu. Pusta lista = bez kasowania.
@@ -2610,13 +2699,23 @@ async def _fetch_achievements(client: httpx.AsyncClient, ha: httpx.AsyncClient,
     if res.status_code != 200:
         logger.warning("[%s] błąd osiągnięć: %d", name, res.status_code)
         return
+    try:
+        ach_raw = res.json()
+    except Exception as e:
+        logger.warning("[%s] błąd parsowania JSON osiągnięć: %s", name, e)
+        return
+    if not isinstance(ach_raw, list):
+        logger.warning("[%s] Nieoczekiwany format osiągnięć (nie lista)", name)
+        return
 
     async with db_lock:
         conn = db_connect()
         try:
             cur = conn.cursor()
             ach_to_insert: list[tuple] = []
-            for item in res.json():
+            for item in ach_raw:
+                if not isinstance(item, dict):
+                    continue
                 item_id = item.get("id")
                 if not item_id:
                     continue
@@ -2685,8 +2784,9 @@ async def _fetch_przedszkole_plan(client: httpx.AsyncClient, ha: httpx.AsyncClie
                 data_raw = z.get("data", "")
                 godz_od  = z.get("godzinaOd", "T00:00")
                 godz_do  = z.get("godzinaDo", "T00:00")
-                # Jak w _fetch_schedule: wartość bez "T" pomijamy.
-                if "T" not in godz_od or "T" not in godz_do:
+                # Jak w _fetch_schedule: wartość bez "T" albo null pomijamy.
+                if (not isinstance(godz_od, str) or not isinstance(godz_do, str)
+                        or "T" not in godz_od or "T" not in godz_do):
                     logger.warning(
                         "[%s] pominięto zajęcia (przedszkole) - nieoczekiwany format godzin "
                         "(od=%r, do=%r)", name, godz_od, godz_do,
@@ -2781,9 +2881,11 @@ async def _fetch_przedszkole_jadlospis(client: httpx.AsyncClient, ha: httpx.Asyn
         try:
             cur = conn.cursor()
             posilki_to_insert: list[tuple] = []
+            diety_pominiete: set[str] = set()
             for dzien in dni_raw:
                 dieta = (dzien.get("dieta") or "").strip().lower()
                 if "przedszkol" not in dieta:
+                    diety_pominiete.add(dieta or "(brak nazwy)")
                     continue  # dieta innej grupy (np. "dzieci szkoła") - pomijamy
 
                 data_raw = dzien.get("data") or ""
@@ -2801,6 +2903,13 @@ async def _fetch_przedszkole_jadlospis(client: httpx.AsyncClient, ha: httpx.Asyn
                         json.dumps(posilek.get("sklad") or [], ensure_ascii=False),
                         json.dumps(posilek.get("alergeny") or [], ensure_ascii=False),
                     ))
+
+            if diety_pominiete and not posilki_to_insert:
+                # Karta zostanie pusta - podajemy nazwy diet, żeby było widać dlaczego.
+                logger.info(
+                    "[%s] jadłospis: żadna dieta nie zawiera \"przedszkol\" (są: %s)",
+                    name, ", ".join(sorted(diety_pominiete)),
+                )
 
             if posilki_to_insert:
                 # Pełna resynchronizacja w oknie dat, żeby zmieniony jadłospis nie zostawał.
@@ -3060,7 +3169,7 @@ async def _fetch_przedszkole_oplaty(client: httpx.AsyncClient, ha: httpx.AsyncCl
 # ────────────────────────────────────────────────
 # PRZEDSZKOLE – informacje o placówce
 # Dane statyczne (adres, dyrektor, kontakt): tabela bez kolumny "data" i poza
-# _PRUNABLE_TABLES (jak "achievements"), bo retencja czasowa nie ma tu sensu.
+# _PRUNE_SQL (jak "achievements"), bo retencja czasowa nie ma tu sensu.
 # ────────────────────────────────────────────────
 
 async def _fetch_przedszkole_informacje(client: httpx.AsyncClient, ha: httpx.AsyncClient,
@@ -3739,9 +3848,12 @@ async def sync_diary_data(students: list, cookies: list) -> None:
                     _fetch_meetings(client, ha, base, s),
                     return_exceptions=True,
                 )
-            for i, r in enumerate(results):
+            # Kolejność nazw = kolejność fetcherów w gather powyżej.
+            section_names = ("oceny", "plan", "terminarz", "uwagi", "frekwencja",
+                             "osiagniecia", "szczesliwy_numerek", "zebrania")
+            for section, r in zip(section_names, results):
                 if isinstance(r, Exception):
-                    logger.error("Sekcja %d błąd dla %s: %s", i, s["uczen"], r, exc_info=r)
+                    logger.error("Sekcja %s błąd dla %s: %s", section, s["uczen"], r, exc_info=r)
             logger.info("=== Zakończono: %s ===", s["uczen"])
 
 
@@ -3779,9 +3891,12 @@ async def sync_przedszkole_data(przedszkolaki: list, cookies: list) -> None:
                     _fetch_przedszkole_nauczyciele(client, ha, base, s),
                     return_exceptions=True,
                 )
-            for i, r in enumerate(results):
+            # Kolejność nazw = kolejność fetcherów w gather powyżej.
+            section_names = ("plan", "jadlospis", "obecnosc", "zebrania",
+                             "oplaty", "informacje", "nauczyciele")
+            for section, r in zip(section_names, results):
                 if isinstance(r, Exception):
-                    logger.error("Sekcja %d błąd dla %s (przedszkole): %s", i, s["uczen"], r, exc_info=r)
+                    logger.error("Sekcja %s błąd dla %s (przedszkole): %s", section, s["uczen"], r, exc_info=r)
 
             # Funkcja synchroniczna (httpx.Client) - poza gather, w osobnym wątku.
             try:
@@ -4145,12 +4260,24 @@ _DATE_DOTTED_RE = re.compile(r"^(\d{1,2})\.(\d{1,2})\.(\d{2,4})?")
 
 # Tabele przycinane po kolumnie "data". Celowo pominięte: "achievements" (brak
 # daty) i "grades" (historia ocen z lat ma wartość dla rodzica).
-_PRUNABLE_TABLES = (
-    "schedule", "remarks", "timetable", "frequency",
-    "free_days", "meetings", "frequency_stats", "lucky_number",
-    "messages", "przedszkole_obecnosc", "przedszkole_plan", "przedszkole_jadlospis",
-    "przedszkole_zebrania", "przedszkole_oplaty", "przedszkole_wiadomosci",
-)
+# Zapytania retencji jako stałe (powód jak przy _DELETE_MISSING_SQL).
+_PRUNE_SQL: dict[str, tuple[str, str]] = {
+    "schedule": ("SELECT rowid, data FROM schedule", "DELETE FROM schedule WHERE rowid=?"),
+    "remarks": ("SELECT rowid, data FROM remarks", "DELETE FROM remarks WHERE rowid=?"),
+    "timetable": ("SELECT rowid, data FROM timetable", "DELETE FROM timetable WHERE rowid=?"),
+    "frequency": ("SELECT rowid, data FROM frequency", "DELETE FROM frequency WHERE rowid=?"),
+    "free_days": ("SELECT rowid, data FROM free_days", "DELETE FROM free_days WHERE rowid=?"),
+    "meetings": ("SELECT rowid, data FROM meetings", "DELETE FROM meetings WHERE rowid=?"),
+    "frequency_stats": ("SELECT rowid, data FROM frequency_stats", "DELETE FROM frequency_stats WHERE rowid=?"),
+    "lucky_number": ("SELECT rowid, data FROM lucky_number", "DELETE FROM lucky_number WHERE rowid=?"),
+    "messages": ("SELECT rowid, data FROM messages", "DELETE FROM messages WHERE rowid=?"),
+    "przedszkole_obecnosc": ("SELECT rowid, data FROM przedszkole_obecnosc", "DELETE FROM przedszkole_obecnosc WHERE rowid=?"),
+    "przedszkole_plan": ("SELECT rowid, data FROM przedszkole_plan", "DELETE FROM przedszkole_plan WHERE rowid=?"),
+    "przedszkole_jadlospis": ("SELECT rowid, data FROM przedszkole_jadlospis", "DELETE FROM przedszkole_jadlospis WHERE rowid=?"),
+    "przedszkole_zebrania": ("SELECT rowid, data FROM przedszkole_zebrania", "DELETE FROM przedszkole_zebrania WHERE rowid=?"),
+    "przedszkole_oplaty": ("SELECT rowid, data FROM przedszkole_oplaty", "DELETE FROM przedszkole_oplaty WHERE rowid=?"),
+    "przedszkole_wiadomosci": ("SELECT rowid, data FROM przedszkole_wiadomosci", "DELETE FROM przedszkole_wiadomosci WHERE rowid=?"),
+}
 
 
 def _normalize_date_prefix(raw) -> str | None:
@@ -4159,11 +4286,11 @@ def _normalize_date_prefix(raw) -> str | None:
     poprawnego formatu - nie jest kalendarzowo poprawna (np. dzień 32,
     miesiąc 13, 29 lutego w roku nieprzestępnym).
 
-    Dane w bazie pochodzą z różnych pól API Vulcan i NIE są jednolicie
-    sformatowane - większość tabel ma ISO 8601 ("2026-09-09", czasem z 'T' i
-    czasem doklejonym), ale np. "messages.data" bywa w polskim formacie
-    kropkowym "09.09.2026" (dowód: normalizacja dat w kartach JS musi
-    obsługiwać obie postacie).
+    Dane w bazie pochodzą z różnych pól API Vulcan. Większość tabel ma ISO 8601
+    ("2026-09-09", czasem z 'T', godziną i strefą, np. "messages.data":
+    "2026-10-29T07:38:50.85+01:00" - sprawdzone na prawdziwej bazie). Format
+    kropkowy "09.09.2026" jest obsługiwany na wszelki wypadek (karty JS też
+    obsługują obie postacie).
 
     W niejasnych przypadkach (brak roku w dacie kropkowej, data niepoprawna
     kalendarzowo, np. "2026-13-45") zwraca None - _prune_old_data takiego
@@ -4221,8 +4348,10 @@ def _prune_stale_ha_cache(cur: sqlite3.Cursor) -> int:
     for entity_id, attrs_json in cur.fetchall():
         try:
             attrs = json.loads(attrs_json)
-        except Exception:
-            continue  # uszkodzony JSON - nie zgadujemy, wiersz zostaje
+        except Exception as e:
+            # uszkodzony JSON - nie zgadujemy, wiersz zostaje
+            logger.debug("[RETENCJA] ha_cache: pomijam %s (uszkodzony JSON: %s)", entity_id, e)
+            continue
         last_update = attrs.get("last_update")
         if not last_update or not isinstance(last_update, str):
             continue
@@ -4253,14 +4382,14 @@ def _prune_old_data() -> None:
             cur = conn.cursor()
             total_deleted = 0
 
-            for table in _PRUNABLE_TABLES:
-                cur.execute(f"SELECT rowid, data FROM {table}")  # noqa: S608 # nosec B608
+            for table, (select_sql, delete_sql) in _PRUNE_SQL.items():
+                cur.execute(select_sql)
                 rowids_to_delete = [
                     (rowid,) for rowid, raw_data in cur.fetchall()
                     if (norm := _normalize_date_prefix(raw_data)) is not None and norm < cutoff
                 ]
                 if rowids_to_delete:
-                    cur.executemany(f"DELETE FROM {table} WHERE rowid=?", rowids_to_delete)  # noqa: S608 # nosec B608
+                    cur.executemany(delete_sql, rowids_to_delete)
                     total_deleted += len(rowids_to_delete)
                     logger.info(
                         "[RETENCJA] %s: usunięto %d wpis(ów) starszych niż %s.",
@@ -4365,6 +4494,7 @@ async def gdansk_main_loop() -> None:
     db_init(conn)
     conn.close()
     failures = 0
+    auth_errors = 0   # Docker: odrzucone logowania z rzędu (LOGIN_REJECTED_STOP_AFTER)
     logger.info("Uruchamianie Vultron: GPE Gdańsk (odczyt UONET+)")
     async with httpx.AsyncClient(headers=HA_HEADERS, timeout=15) as ha:
         await restore_entities_from_cache(ha)
@@ -4398,12 +4528,29 @@ async def gdansk_main_loop() -> None:
                         logger.warning("[GPE] %s", error)
                     logger.info("[GPE] Odczyt zakończony: %d encji, %d problemów", published, len(errors))
                     failures = 0
+                    auth_errors = 0
                 except AuthenticationError as exc:
                     logger.error("[GPE] %s", exc)
                     await publish_sensor(ha, "sensor.vultron_gdansk_status", "authentication_error",
                                          "Vultron Gdańsk – synchronizacja", {"error": str(exc)})
                     # Do not repeatedly submit an invalid password.
-                    break
+                    if IS_ADDON:
+                        break
+                    # Docker: wyjście z procesu = restart przez "restart: unless-stopped"
+                    # i kolejne logowanie co ~minutę. Jak w eduVULCAN: druga próba
+                    # w następnym cyklu, potem czekamy bezczynnie na SIGTERM.
+                    auth_errors += 1
+                    if auth_errors >= LOGIN_REJECTED_STOP_AFTER:
+                        logger.critical(
+                            "!!! [GPE] Docker: logowanie nieudane %d razy z rzędu - kontener zostaje "
+                            "uruchomiony, ale bez logowania. Popraw data/options.json i zrób: "
+                            "docker compose restart !!!", auth_errors,
+                        )
+                        await stop.wait()
+                        break
+                    failures += 1
+                    logger.warning("[GPE] Logowanie nieudane (%d/%d) - jeszcze jedna próba w następnym cyklu.",
+                                   auth_errors, LOGIN_REJECTED_STOP_AFTER)
                 except asyncio.TimeoutError:
                     logger.error("[GPE] Przekroczono limit 10 minut; przerywam proces przeglądarki")
                     os._exit(1)
@@ -4553,6 +4700,16 @@ async def main_loop() -> None:
                         await _publish_status(ha, "authentication_error",
                                               "Logowanie odrzucone przez eduVULCAN - sprawdź login i hasło",
                                               last_success)
+                        if not IS_ADDON:
+                            # Docker: wyjście z procesu = restart przez
+                            # "restart: unless-stopped" i licznik od zera, czyli
+                            # kolejne złe hasła. Czekamy bezczynnie na SIGTERM
+                            # (docker compose restart/stop po poprawie danych).
+                            logger.critical(
+                                "!!! Docker: kontener zostaje uruchomiony, ale bez logowania. Popraw "
+                                "data/options.json i zrób: docker compose restart !!!"
+                            )
+                            await stop_event.wait()
                         # Zatrzymanie przez stop_event (bez sys.exit() w coroutine).
                         stop_event.set()
                         break
@@ -4634,6 +4791,7 @@ async def main_loop() -> None:
 
             now_after = datetime.now()
             wd_after = now_after.weekday()
+            cykl = "Cykl OK" if login_ok else "Cykl bez danych (logowanie nieudane)"
 
             if not _test_mode:
                 if wd_after == 5:
@@ -4643,7 +4801,7 @@ async def main_loop() -> None:
                     else:
                         wake_at = (now_after + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
                     wait_time = int(max(60, (wake_at - now_after).total_seconds()))
-                    logger.info("Cykl OK (Sobota) → następne pobieranie o %s (za ~%d min)", wake_at.strftime("%H:%M"), wait_time // 60)
+                    logger.info("%s (Sobota) → następne pobieranie o %s (za ~%d min)", cykl, wake_at.strftime("%H:%M"), wait_time // 60)
 
                 elif wd_after == 6:
                     next_h = next((h for h in (8, 12, 20) if h > now_after.hour), None)
@@ -4652,18 +4810,18 @@ async def main_loop() -> None:
                     else:
                         wake_at = (now_after + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
                     wait_time = int(max(60, (wake_at - now_after).total_seconds()))
-                    logger.info("Cykl OK (Niedziela) → następne pobieranie o %s (za ~%d min)", wake_at.strftime("%H:%M"), wait_time // 60)
+                    logger.info("%s (Niedziela) → następne pobieranie o %s (za ~%d min)", cykl, wake_at.strftime("%H:%M"), wait_time // 60)
 
                 else:
                     # 40-60 min z losowym rozrzutem
                     wait_time = 2400 + secrets.randbelow(1201)
                     next_run = now_after + timedelta(seconds=wait_time)
-                    logger.info("Cykl OK → następny za ~%d min (o %s)", wait_time // 60, next_run.strftime("%H:%M"))
+                    logger.info("%s → następny za ~%d min (o %s)", cykl, wait_time // 60, next_run.strftime("%H:%M"))
             else:
                 # j.w.
                 wait_time = 2400 + secrets.randbelow(1201)
                 next_run = now_after + timedelta(seconds=wait_time)
-                logger.info("[TEST MODE] Cykl OK → następny za ~%d min (o %s)", wait_time // 60, next_run.strftime("%H:%M"))
+                logger.info("[TEST MODE] %s → następny za ~%d min (o %s)", cykl, wait_time // 60, next_run.strftime("%H:%M"))
 
             # Backoff: patrz AUTH_BACKOFF_*.
             if auth_fail_streak > 1:

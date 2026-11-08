@@ -18,6 +18,7 @@ permissions: {}
 jobs:
   trivy-image:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: read
@@ -34,6 +35,9 @@ jobs:
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           scan-type: image
+          # Wersja Trivy (domyślna w trivy-action v0.36.0 to v0.70.0). Dependabot
+          # jej nie podbija - aktualizuj ręcznie razem z akcją.
+          version: 'v0.76.1'
           image-ref: ghcr.io/htomasz/vultron:${{ inputs.tag || 'latest' }}
           format: sarif
           output: trivy-image.sarif
@@ -43,7 +47,7 @@ jobs:
 
       - name: Wyślij wyniki do zakładki Security
         if: always()
-        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           sarif_file: trivy-image.sarif
           category: trivy-image
