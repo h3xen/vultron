@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
+// Wersja karty - podbijaj przy każdej zmianie pliku, żeby w konsoli przeglądarki
+// (F12) od razu widać było, czy Home Assistant załadował nowy plik, a nie cache.
+const VULTRON_CARD_VERSION = '7.2.1-h3xen.1';
+
 class VultronPlanCard extends HTMLElement {
   constructor() {
     super();
@@ -43,50 +48,158 @@ class VultronPlanCard extends HTMLElement {
     if (!this.content) {
       this.innerHTML = `
         <style>
-          .marker-wrapper { position: relative; display: inline-block; cursor: help; }
-          .vultron-tooltip {
+          /* ============================================================
+             WYGLĄD KARTY PLANU LEKCJI - zmieniaj wartości tutaj.
+             Zmienne można też nadpisać w YAML-u karty (card-mod):
+               card_mod:
+                 style: |
+                   :host, vultron-card { --vp-time-col-width: 100px; }
+             ============================================================ */
+          vultron-card {
+            /* Skala CAŁEJ tabeli: 1 = bez zmian, 0.8 = o 20% mniejsza, 1.2 = większa */
+            --vp-scale: 1;
+            /* Nagłówek karty (nazwa ucznia + tydzień + strzałki) */
+            --vp-head-pad-top: 1px;          /* odstęp nad nagłówkiem (było 16px) */
+            --vp-head-pad-bottom: 1px;       /* odstęp pod nagłówkiem, nad linią (było 8px) */
+            --vp-head-gap: 6px;              /* odstęp między linią a tabelą (było 12px) */
+            --vp-nav-size: 14px;             /* wielkość strzałek poprzedni/następny tydzień (było 32px) */
+            --vp-font-student: 1em;          /* nazwa ucznia (było 1.1em) */
+            /* Rozmiary */
+            --vp-table-min-width: 650px;   /* minimalna szerokość tabeli (poniżej - przewijanie) */
+            --vp-time-col-width: 85px;       /* szerokość kolumny GODZINA (i żółtej etykiety czasu) */
+            --vp-header-padding: 0px;       /* odstęp w nagłówkach dni */
+            --vp-time-cell-padding: 10px 5px;/* odstęp w komórce godziny */
+            --vp-cell-padding: 4px;          /* odstęp w komórce dnia */
+            --vp-lesson-padding: 0px;        /* odstęp wewnątrz kafelka lekcji */
+            --vp-lesson-min-height: 0px;    /* minimalna wysokość kafelka lekcji */
+            /* Czcionki */
+            --vp-font-time: 0.8em;           /* godziny lekcji */
+            --vp-font-lesson: 0.9em;         /* nazwa lekcji */
+            --vp-font-meta: 0.72em;          /* sala i nauczyciel */
+            --vp-font-pill: 0.65em;          /* plakietki statusu (Odwołane itd.) */
+            /* Kolory */
+            --vp-border: 1px solid var(--divider-color);
+            --vp-now-line: #ffff00;          /* kreska aktualnej godziny */
+            --vp-odwol: #d32f2f;
+            --vp-zwol: #388e3c;
+            --vp-zast: #ef6c00;
+            --vp-przen: #1976d2;
+            --vp-nieob: #7b1fa2;
+            --vp-odwol-bg: transparent;
+            --vp-zwol-bg: rgba(76, 175, 80, 0.08);
+            --vp-zast-bg: rgba(255, 165, 0, 0.12);
+            --vp-przen-bg: rgba(33, 150, 243, 0.1);
+            --vp-nieob-bg: rgba(156, 39, 176, 0.1);
+          }
+
+          /* Nagłówek karty */
+          vultron-card .vp-wrap { padding: var(--vp-head-pad-top) 16px 16px; position: relative; }
+          vultron-card .vp-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--vp-head-gap); border-bottom: 2px solid var(--primary-color); padding-bottom: var(--vp-head-pad-bottom); }
+          vultron-card .vp-nav { --mdc-icon-button-size: var(--vp-nav-size); cursor: pointer; color: var(--primary-color); }
+          vultron-card .vp-title { text-align: center; flex: 1; line-height: 1.2; }
+          vultron-card .vp-student { font-size: var(--vp-font-student); font-weight: 500; color: #00bcd4; text-align: center; }
+          vultron-card .vp-week { font-weight: bold; font-size: 0.8em; color: var(--primary-color); text-transform: uppercase; letter-spacing: 1px; margin-top: 0; }
+
+          /* Tabela */
+          vultron-card .vp-scroll { zoom: var(--vp-scale); overflow-x: auto;border: var(--vp-border); border-radius: 8px; }
+          vultron-card .vp-box { position: relative; min-width: var(--vp-table-min-width); width: 100%; }
+          vultron-card .vp-table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: var(--vp-table-min-width); border: none; }
+          vultron-card .vp-table thead tr { background: var(--secondary-background-color); }
+          vultron-card .vp-th { padding: var(--vp-header-padding); border: var(--vp-border); }
+          vultron-card .vp-th-time { width: var(--vp-time-col-width); font-size: 0.8em; }
+          vultron-card .day-header { background: transparent; }
+          vultron-card .day-header.vp-today { background: rgba(var(--rgb-primary-color), 0.15); border-bottom: 3px solid var(--accent-color); }
+          vultron-card .vp-date { font-weight: bold; color: var(--primary-color); background: var(--secondary-background-color); padding: 2px 6px; border-radius: 6px; font-size: 0.78em; white-space: nowrap; }
+
+          /* Kreska aktualnej godziny */
+          vultron-card .vp-line { display: none; position: absolute; left: var(--vp-time-col-width); right: 0; height: 2px; background: var(--vp-now-line); z-index: 1000; pointer-events: none; box-shadow: 0 0 4px rgba(255, 255, 0, 0.6); }
+          vultron-card .vp-line-label { position: absolute; left: calc(-1 * var(--vp-time-col-width)); top: -10px; width: var(--vp-time-col-width); height: 20px; background: var(--vp-now-line); color: #000 !important; font-size: 12px; font-weight: 900; text-align: center; line-height: 20px; border-radius: 0 10px 10px 0; box-shadow: 2px 0 5px rgba(0,0,0,0.3); z-index: 1001; }
+
+          /* Komórki */
+          vultron-card .vp-empty { text-align: center; padding: 20px; }
+          vultron-card .vp-time { padding: var(--vp-time-cell-padding); text-align: center; border: var(--vp-border); font-size: var(--vp-font-time); background: var(--card-background-color); color: inherit; font-weight: bold; }
+          vultron-card .vp-time.vp-now { background: var(--accent-color); color: white; }
+          vultron-card .vp-cell { padding: var(--vp-cell-padding); border: var(--vp-border); vertical-align: top; position: relative; background: transparent; }
+          vultron-card .vp-cell.vp-today { background: rgba(var(--rgb-primary-color), 0.05); }
+          vultron-card .vp-cell.vp-now { box-shadow: inset 0 0 0 2px var(--accent-color); z-index: 5; background: rgba(var(--rgb-accent-color), 0.1) !important; }
+          vultron-card .vp-now-tag { position: absolute; top: 0; right: 0; font-size: 0.5em; background: var(--accent-color); color: white; padding: 1px 4px; font-weight: bold; border-bottom-left-radius: 4px; z-index: 6; }
+
+          /* Dzień wolny */
+          vultron-card .vp-free { padding: var(--vp-cell-padding); border: var(--vp-border); vertical-align: middle; text-align: center; background: rgba(var(--rgb-primary-color), 0.02); }
+          vultron-card .vp-free.vp-today { background: rgba(var(--rgb-primary-color), 0.05); }
+          vultron-card .vp-free.vp-cur { box-shadow: inset 0 0 0 2px var(--primary-color); z-index: 5; }
+          vultron-card .vp-free-box { font-weight: bold; color: var(--primary-color); font-size: 0.9em; line-height: 1.3; padding: 12px 6px; border-radius: 8px; background: rgba(var(--rgb-primary-color), 0.1); border: 1px dashed var(--primary-color); }
+
+          /* Kafelek lekcji */
+          vultron-card .vp-lesson { position: relative; min-height: var(--vp-lesson-min-height); padding: var(--vp-lesson-padding); background: transparent; border-radius: 4px; }
+          vultron-card .vp-lesson + .vp-lesson { border-top: 1px dashed var(--divider-color); margin-top: 5px; }
+          vultron-card .vp-lesson-name { font-weight: 600; font-size: var(--vp-font-lesson); line-height: 1.2; }
+          vultron-card .vp-lesson-meta { font-size: var(--vp-font-meta); opacity: 0.7; margin-top: 1px; clear: both; }
+          /* Prawy górny róg kafelka: znacznik frekwencji + plakietka statusu.
+             float - tekst lekcji zawija się pod nim i nie nachodzi na plakietkę. */
+          vultron-card .vp-corner { float: right; display: flex; align-items: center; gap: 4px; margin: 0 0 2px 4px; }
+          vultron-card .vp-lesson--odwol { background: var(--vp-odwol-bg); }
+          vultron-card .vp-lesson--odwol .vp-lesson-name { text-decoration: line-through; opacity: 0.5; }
+          vultron-card .vp-lesson--zwol { background: var(--vp-zwol-bg); }
+          vultron-card .vp-lesson--zwol .vp-lesson-name { text-decoration: line-through; opacity: 0.6; }
+          vultron-card .vp-lesson--zast { background: var(--vp-zast-bg); }
+          vultron-card .vp-lesson--przen { background: var(--vp-przen-bg); }
+          vultron-card .vp-lesson--nieob { background: var(--vp-nieob-bg); }
+
+          /* Plakietki statusu */
+          vultron-card .vp-pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: var(--vp-font-pill); font-weight: 900; color: white; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; }
+          vultron-card .vp-pill--odwol { background: var(--vp-odwol); }
+          vultron-card .vp-pill--zwol { background: var(--vp-zwol); }
+          vultron-card .vp-pill--zast { background: var(--vp-zast); }
+          vultron-card .vp-pill--przen { background: var(--vp-przen); }
+          vultron-card .vp-pill--nieob { background: var(--vp-nieob); }
+
+          /* Znacznik frekwencji i podpowiedź */
+          vultron-card .vp-marker { padding: 0 2px; border-radius: 3px; font-size: 0.9em; font-weight: bold; }
+          vultron-card .marker-wrapper { position: relative; display: inline-block; cursor: help; }
+          vultron-card .vultron-tooltip {
             visibility: hidden; opacity: 0; background: rgba(var(--rgb-card-background-color, 255, 255, 255), 0.7);
             backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); text-align: center; border-radius: 6px;
             padding: 5px 10px; position: absolute; z-index: 100; bottom: 125%; right: 0; transform: translateY(10px);
             box-shadow: 0 4px 15px rgba(0,0,0,0.2); border: 1px solid var(--divider-color);
             transition: all 0.2s ease-in-out; pointer-events: none; font-size: 0.8em; white-space: nowrap; font-weight: bold;
           }
-          .marker-wrapper:hover .vultron-tooltip { visibility: visible; opacity: 1; transform: translateY(0); }
+          vultron-card .marker-wrapper:hover .vultron-tooltip { visibility: visible; opacity: 1; transform: translateY(0); }
         </style>
         <ha-card>
-          <div style="padding: 16px; position: relative;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 2px solid var(--primary-color); padding-bottom: 8px;">
-              <ha-icon-button id="prev-week" style="--mdc-icon-button-size: 32px; cursor: pointer; color: var(--primary-color);">
+          <div class="vp-wrap">
+            <div class="vp-head">
+              <ha-icon-button id="prev-week" class="vp-nav">
                 <ha-icon icon="mdi:chevron-left"></ha-icon>
               </ha-icon-button>
 
-              <div style="text-align: center; flex: 1;">
-                <div id="student-name" style="font-size: 1.1em; font-weight: 500; color: #00bcd4; text-align: center;"></div>
-                <div id="week-label" style="font-weight: bold; font-size: 0.8em; color: var(--primary-color); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;"></div>
+              <div class="vp-title">
+                <div id="student-name" class="vp-student"></div>
+                <div id="week-label" class="vp-week"></div>
               </div>
 
-              <ha-icon-button id="next-week" style="--mdc-icon-button-size: 32px; cursor: pointer; color: var(--primary-color);">
+              <ha-icon-button id="next-week" class="vp-nav">
                 <ha-icon icon="mdi:chevron-right"></ha-icon>
               </ha-icon-button>
             </div>
 
-            <div id="table-wrapper" style="overflow-x: auto; border: 1px solid var(--divider-color); border-radius: 8px;">
-              <div style="position: relative; min-width: 650px; width: 100%;">
+            <div id="table-wrapper" class="vp-scroll">
+              <div class="vp-box">
 
                 <!-- ŻÓŁTA KRESKA CZASU -->
-                <div id="time-line" style="display: none; position: absolute; left: 85px; right: 0; height: 2px; background: #ffff00; z-index: 1000; pointer-events: none; box-shadow: 0 0 4px rgba(255, 255, 0, 0.6);">
-                  <div id="time-label" style="position: absolute; left: -85px; top: -10px; width: 85px; height: 20px; background: #ffff00; color: #000 !important; font-size: 12px; font-weight: 900; text-align: center; line-height: 20px; border-radius: 0 10px 10px 0; box-shadow: 2px 0 5px rgba(0,0,0,0.3); z-index: 1001;">--:--</div>
+                <div id="time-line" class="vp-line">
+                  <div id="time-label" class="vp-line-label">--:--</div>
                 </div>
 
-                <table style="width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 650px; border: none;">
+                <table class="vp-table">
                   <thead>
-                    <tr style="background: var(--secondary-background-color);">
-                      <th style="width: 85px; padding: 10px; border: 1px solid var(--divider-color); font-size: 0.8em;">GODZINA</th>
-                      <th class="day-header" style="padding: 10px; border: 1px solid var(--divider-color);">PON</th>
-                      <th class="day-header" style="padding: 10px; border: 1px solid var(--divider-color);">WT</th>
-                      <th class="day-header" style="padding: 10px; border: 1px solid var(--divider-color);">ŚR</th>
-                      <th class="day-header" style="padding: 10px; border: 1px solid var(--divider-color);">CZW</th>
-                      <th class="day-header" style="padding: 10px; border: 1px solid var(--divider-color);">PT</th>
+                    <tr>
+                      <th class="vp-th vp-th-time">GODZINA</th>
+                      <th class="vp-th day-header">PON</th>
+                      <th class="vp-th day-header">WT</th>
+                      <th class="vp-th day-header">ŚR</th>
+                      <th class="vp-th day-header">CZW</th>
+                      <th class="vp-th day-header">PT</th>
                     </tr>
                   </thead>
                   <tbody id="plan-body"></tbody>
@@ -152,6 +265,11 @@ class VultronPlanCard extends HTMLElement {
   _forceUpdate() {
     this._cachedWeekOffset = null;
     this.hass = this._hass;
+  }
+
+  connectedCallback() {
+    // Atrybuty wolno ustawiać dopiero po podpięciu do DOM (nie w konstruktorze).
+    this.setAttribute('data-version', VULTRON_CARD_VERSION);
   }
 
   disconnectedCallback() {
@@ -227,7 +345,7 @@ class VultronPlanCard extends HTMLElement {
 
   updatePlan(planState, freqState, suffix) {
     if (!planState || (!planState.attributes.lekcje && !planState.attributes.dni_wolne)) {
-      this.content.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px;">Brak danych planu (${suffix})</td></tr>`;
+      this.content.innerHTML = `<tr><td colspan="6" class="vp-empty">Brak danych planu (${suffix})</td></tr>`;
       return;
     }
 
@@ -244,12 +362,11 @@ class VultronPlanCard extends HTMLElement {
         const isToday = dISO === todayISO;
         this.dayHeaders[i].innerHTML = `
           ${["PON","WT","ŚR","CZW","PT"][i]}<br>
-          <span style="font-weight: bold; color: var(--primary-color); background: var(--secondary-background-color); padding: 2px 6px; border-radius: 6px; font-size: 0.78em; white-space: nowrap;">
+          <span class="vp-date">
             ${dISO}
           </span>
         `;
-        this.dayHeaders[i].style.background = isToday ? "rgba(var(--rgb-primary-color), 0.15)" : "transparent";
-        this.dayHeaders[i].style.borderBottom = isToday ? "3px solid var(--accent-color)" : "1px solid var(--divider-color)";
+        this.dayHeaders[i].classList.toggle('vp-today', isToday);
       }
     }
 
@@ -274,18 +391,17 @@ class VultronPlanCard extends HTMLElement {
       const nowM = now.getHours()*60 + now.getMinutes();
       const isNow = this._weekOffset === 0 && nowM >= sM && nowM < eM;
 
-      html += `<tr><td style="padding: 10px 5px; text-align: center; border: 1px solid var(--divider-color); font-size: 0.8em; background: ${isNow ? 'var(--accent-color)' : 'var(--card-background-color)'}; color: ${isNow ? 'white' : 'inherit'}; font-weight: bold;">${this._esc(slot)}</td>`;
+      html += `<tr><td class="vp-time${isNow ? ' vp-now' : ''}">${this._esc(slot)}</td>`;
 
       weekDates.forEach(date => {
         const freeDay = dni_wolne.find(fd => fd.d === date);
         if (freeDay) {
           if (slotIndex === 0) {
             const isToday = date === todayISO;
-            const highlightStyle = (isToday && this._weekOffset === 0) ? `box-shadow: inset 0 0 0 2px var(--primary-color); z-index: 5;` : '';
-            const todayBg = isToday ? `background: rgba(var(--rgb-primary-color), 0.05);` : `background: rgba(var(--rgb-primary-color), 0.02);`;
+            const freeCls = 'vp-free' + (isToday ? ' vp-today' : '') + ((isToday && this._weekOffset === 0) ? ' vp-cur' : '');
             html += `
-              <td rowspan="${slots.length}" style="padding: 4px; border: 1px solid var(--divider-color); vertical-align: middle; text-align: center; ${todayBg} ${highlightStyle}">
-                <div style="font-weight: bold; color: var(--primary-color); font-size: 0.9em; line-height: 1.3; padding: 12px 6px; border-radius: 8px; background: rgba(var(--rgb-primary-color), 0.1); border: 1px dashed var(--primary-color);">
+              <td rowspan="${slots.length}" class="${freeCls}">
+                <div class="vp-free-box">
                   ${this._esc(freeDay.n)}
                 </div>
               </td>`;
@@ -294,18 +410,19 @@ class VultronPlanCard extends HTMLElement {
           const isToday = date === todayISO, isCur = isToday && isNow, lessons = lekcje.filter(lek => lek.d === date && lek.g === slot);
           let cellContent = "";
           lessons.forEach((l, idx) => {
-            let statusTag = "", textStyle = "font-weight: 600; font-size: 0.9em; line-height: 1.2;", blockBg = "transparent";
-            const pillStyle = "display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.65em; font-weight: 900; color: white; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;";
+            let statusTag = "", lessonCls = "", blockStyle = "";
+            const pill = (mod, label) => `<div class="vp-pill vp-pill--${mod}">${label}</div>`;
 
-            if (l.st === 'ODWOL') { textStyle += " text-decoration: line-through; opacity: 0.5;"; statusTag = `<div style="${pillStyle} background: #d32f2f;">Odwołane</div>`; }
-            else if (l.st === 'ZWOL') { blockBg = "rgba(76, 175, 80, 0.08)"; textStyle += " text-decoration: line-through; opacity: 0.6;"; statusTag = `<div style="${pillStyle} background: #388e3c;">Zwolnienie</div>`; }
-            else if (l.st === 'ZAST') { blockBg = "rgba(255, 165, 0, 0.12)"; statusTag = `<div style="${pillStyle} background: #ef6c00;">Zastępstwo</div>`; }
-            else if (l.st === 'PRZEN') { blockBg = "rgba(33, 150, 243, 0.1)"; statusTag = `<div style="${pillStyle} background: #1976d2;">Przeniesione</div>`; }
-            else if (l.st === 'NIEOB') { blockBg = "rgba(156, 39, 176, 0.1)"; statusTag = `<div style="${pillStyle} background: #7b1fa2;">Nieobecni</div>`; }
+            if (l.st === 'ODWOL') { lessonCls = " vp-lesson--odwol"; statusTag = pill('odwol', 'Odwołane'); }
+            else if (l.st === 'ZWOL') { lessonCls = " vp-lesson--zwol"; statusTag = pill('zwol', 'Zwolnienie'); }
+            else if (l.st === 'ZAST') { lessonCls = " vp-lesson--zast"; statusTag = pill('zast', 'Zastępstwo'); }
+            else if (l.st === 'PRZEN') { lessonCls = " vp-lesson--przen"; statusTag = pill('przen', 'Przeniesione'); }
+            else if (l.st === 'NIEOB') { lessonCls = " vp-lesson--nieob"; statusTag = pill('nieob', 'Nieobecni'); }
             else if (l.st === 'WLASNE') {
+              // Kolor liczony dynamicznie z identyfikatora encji - jedyny styl inline.
               const _cc = this._customLessonColor();
-              blockBg = `${_cc}1A`;
-              statusTag = `<div style="${pillStyle} background: ${_cc};">Z kalendarza</div>`;
+              blockStyle = ` style="background: ${_cc}1A;"`;
+              statusTag = `<div class="vp-pill" style="background: ${_cc};">Z kalendarza</div>`;
             }
 
             let marker = "";
@@ -313,7 +430,6 @@ class VultronPlanCard extends HTMLElement {
               const planStart = l.g.split('-')[0].trim().replace(/^0/, "");
               const record = freqState.attributes.wpisy.find(f => f.d === date && f.t.trim().replace(/^0/, "") === planStart);
               if (record) {
-                const b = "padding: 0 2px; border-radius: 3px; font-size: 0.9em; font-weight: bold;";
                 let color = "", text = "", desc = "";
                 if (record.k === 1) { color = "#4caf50"; text = "[o]"; desc = "Obecność"; }
                 else if (record.k === 2) { color = "#f44336"; text = "[n]"; desc = "Nieobecność"; }
@@ -325,27 +441,23 @@ class VultronPlanCard extends HTMLElement {
                 if (text) {
                   marker = `
                     <div class="marker-wrapper">
-                      <b style="color: ${color}; background: ${color}1A; ${b}">${text}</b>
+                      <b class="vp-marker" style="color: ${color}; background: ${color}1A;">${text}</b>
                       <div class="vultron-tooltip" style="color: ${color};">${desc}</div>
                     </div>`;
                 }
               }
             }
-            const sep = idx > 0 ? "border-top: 1px dashed var(--divider-color); margin-top: 5px; padding-top: 5px;" : "";
-
             cellContent += `
-              <div style="${sep} position: relative; min-height: 45px; padding: 4px; background: ${blockBg}; border-radius: 4px;">
-                <div style="${textStyle}">${this._esc(l.p)}</div>
-                <div style="font-size: 0.72em; opacity: 0.7; margin-top: 1px;">${this._esc(l.s)} ${l.n ? ' • ' + this._esc(l.n) : ''}</div>
-                ${statusTag}
-                <div style="position: absolute; top: 2px; right: 2px;">${marker}</div>
+              <div class="vp-lesson${lessonCls}"${blockStyle}>
+                <div class="vp-corner">${marker}${statusTag}</div>
+                <div class="vp-lesson-name">${this._esc(l.p)}</div>
+                <div class="vp-lesson-meta">${this._esc(l.s)} ${l.n ? ' • ' + this._esc(l.n) : ''}</div>
               </div>`;
           });
-          const highlightStyle = isCur ? `box-shadow: inset 0 0 0 2px var(--accent-color); z-index: 5; background: rgba(var(--rgb-accent-color), 0.1) !important;` : '';
-          const todayBg = isToday ? `background: rgba(var(--rgb-primary-color), 0.05);` : `background: transparent;`;
+          const cellCls = 'vp-cell' + (isToday ? ' vp-today' : '') + (isCur ? ' vp-now' : '');
           html += `
-            <td style="padding: 4px; border: 1px solid var(--divider-color); vertical-align: top; position: relative; ${todayBg} ${highlightStyle}">
-              ${isCur ? '<div style="position: absolute; top: 0; right: 0; font-size: 0.5em; background: var(--accent-color); color: white; padding: 1px 4px; font-weight: bold; border-bottom-left-radius: 4px; z-index: 6;">TERAZ</div>' : ''}
+            <td class="${cellCls}">
+              ${isCur ? '<div class="vp-now-tag">TERAZ</div>' : ''}
               ${cellContent}
             </td>`;
         }
@@ -353,7 +465,7 @@ class VultronPlanCard extends HTMLElement {
       html += `</tr>`;
     });
 
-    this.content.innerHTML = html || `<tr><td colspan="6" style="text-align: center; padding: 20px;">Brak zajęć</td></tr>`;
+    this.content.innerHTML = html || `<tr><td colspan="6" class="vp-empty">Brak zajęć</td></tr>`;
 
     // Ponowne pozycjonowanie po ułożeniu kafelków przez HA
     if (this.isConnected) {
@@ -386,3 +498,9 @@ class VultronPlanCard extends HTMLElement {
 }
 
 customElements.define("vultron-card", VultronPlanCard);
+
+console.info(
+  `%c VULTRON-CARD %c ${VULTRON_CARD_VERSION} `,
+  'color: white; background: #03a9f4; font-weight: bold;',
+  'color: #03a9f4; background: white; font-weight: bold;'
+);
