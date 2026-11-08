@@ -62,14 +62,23 @@ def main() -> int:
             print(f"FAIL: po loginie brak pola #Password, zrzut: {shot}")
             return 1
         # Zabezpieczenie przed robotami: Enter przed 100% jest odrzucany i czyści pole.
+        # Widget pojawia się warunkowo (nie przy każdym logowaniu).
         try:
-            page.locator("span.captcha-success-label").wait_for(state="visible", timeout=60000)
+            page.locator("[class*='captcha']").first.wait_for(state="visible", timeout=4000)
+            captcha = True
         except PWTimeout:
-            page.screenshot(path=shot)
-            print(f"FAIL: sprawdzanie anty-robot nie zakończyło się, zrzut: {shot}")
-            return 1
-        print("OK: sprawdzanie anty-robot zakończone, czekam 10 s")
-        page.wait_for_timeout(10000)
+            captcha = False
+        if captcha:
+            try:
+                page.locator("span.captcha-success-label").wait_for(state="visible", timeout=60000)
+            except PWTimeout:
+                page.screenshot(path=shot)
+                print(f"FAIL: sprawdzanie anty-robot nie zakończyło się, zrzut: {shot}")
+                return 1
+            print("OK: sprawdzanie anty-robot zakończone, czekam 10 s")
+            page.wait_for_timeout(10000)
+        else:
+            print("Brak widgetu anty-robot (pomijam)")
         page.fill("#Password", password)
         page.get_by_role("button", name="Zaloguj").click()
 

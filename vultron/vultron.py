@@ -806,6 +806,16 @@ def _get_driver() -> webdriver.Chrome:
             logger.debug("[AUTH] Zignorowano błąd przy zamykaniu przeglądarki: %s", e)
         _hard_kill_service(service)
         raise
+
+    # Ukrycie flagi navigator.webdriver (zabezpieczenie przed robotami na stronie
+    # logowania). Niepowodzenie nie przerywa logowania.
+    try:
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {"source": "delete Object.getPrototypeOf(navigator).webdriver;"},
+        )
+    except Exception as e:
+        logger.debug("[AUTH] Nie ustawiono skryptu anty-detekcji: %s", e)
     return driver
 
 # ────────────────────────────────────────────────
@@ -1170,6 +1180,9 @@ LOGIN_REJECTED_WAIT = 30
 # przypadkiem (wolny sprzęt, weryfikacja), dwa jeszcze nie grożą blokadą konta.
 LOGIN_REJECTED_STOP_AFTER = 2
 
+# Maks. czas (s) oczekiwania na zakończenie sprawdzania "przed robotami" przy haśle.
+CAPTCHA_WAIT = 60
+
 
 class LoginRejected(Exception):
     """Po wysłaniu danych przeglądarka nadal stoi na formularzu logowania (złe
@@ -1363,7 +1376,35 @@ def run_diary_auth() -> tuple[list | None, list | None, list | None]:
                     err_path = _save_error_screenshot()
                     logger.error("[AUTH] Po wpisaniu loginu nie pojawiło się pole hasła. Zrzut ekranu: %s", err_path)
                     raise
-                password_field.send_keys(CONFIG.get("password", "") + Keys.ENTER)
+
+                # Zabezpieczenie przed robotami: Enter przed zakończeniem sprawdzania
+                # jest odrzucany i czyści pole hasła, więc czekamy na znacznik sukcesu.
+                # Widget pojawia się warunkowo (nie przy każdym logowaniu), więc
+                # najpierw krótko sprawdzamy, czy w ogóle jest.
+                try:
+                    WebDriverWait(driver, 4).until(
+                        EC.visibility_of_element_located((By.CSS_SELECTOR, "[class*='captcha']"))
+                    )
+                    captcha_present = True
+                except TimeoutException:
+                    captcha_present = False
+                if captcha_present:
+                    try:
+                        WebDriverWait(driver, CAPTCHA_WAIT).until(
+                            EC.visibility_of_element_located((By.CSS_SELECTOR, "span.captcha-success-label"))
+                        )
+                    except TimeoutException:
+                        logger.warning("[AUTH] Sprawdzanie anty-robot nie zakończyło się w %d s - próbuję mimo to.",
+                                       CAPTCHA_WAIT)
+
+                password_field.send_keys(CONFIG.get("password", ""))
+                # Przycisk "Zaloguj"; gdy go nie znajdziemy, zostaje Enter.
+                login_buttons = [b for b in driver.find_elements(
+                    By.XPATH, "//button[contains(normalize-space(.), 'Zaloguj')]") if b.is_displayed()]
+                if login_buttons:
+                    login_buttons[0].click()
+                else:
+                    password_field.send_keys(Keys.ENTER)
                 credentials_sent = True
 
             # Oczekiwanie na kafelki Dziennika. Vulcan serwuje różnym użytkownikom
