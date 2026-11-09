@@ -152,6 +152,38 @@ except (TypeError, ValueError):
     REFRESH_MINUTES = 40
 
 
+def _parse_refresh_times(raw) -> list[tuple[int, int]]:
+    """Lista "HH:MM" z opcji -> posortowane, unikalne pary (godzina, minuta). Błędne wpisy pomija."""
+    result = set()
+    for item in raw or []:
+        try:
+            h, m = str(item).strip().split(":")
+            h, m = int(h), int(m)
+        except ValueError:
+            logger.warning("Opcja refresh_times: pomijam niepoprawną godzinę %r (oczekiwano HH:MM).", item)
+            continue
+        if 0 <= h <= 23 and 0 <= m <= 59:
+            result.add((h, m))
+        else:
+            logger.warning("Opcja refresh_times: pomijam godzinę poza zakresem %r.", item)
+    return sorted(result)
+
+
+# Stałe godziny pobierania (opcjonalne). Gdy podane, zastępują odstęp
+# refresh_minutes i harmonogram nocny/weekendowy: pobieranie tylko o tych godzinach.
+REFRESH_TIMES = _parse_refresh_times(CONFIG.get("refresh_times"))
+
+
+def _next_refresh_time(now: datetime) -> datetime:
+    """Najbliższa godzina z REFRESH_TIMES po `now` (dziś lub jutro)."""
+    for h, m in REFRESH_TIMES:
+        candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if candidate > now:
+            return candidate
+    h, m = REFRESH_TIMES[0]
+    return (now + timedelta(days=1)).replace(hour=h, minute=m, second=0, microsecond=0)
+
+
 def _poll_interval_seconds() -> int:
     """Odstęp do następnego pobrania: baza + losowo do połowy bazy (40 min -> 40-60 min)."""
     base = REFRESH_MINUTES * 60
@@ -4681,7 +4713,9 @@ async def main_loop() -> None:
 
             wake_at = None
 
-            if not _test_mode:
+            if REFRESH_TIMES:
+                pass  # stałe godziny z opcji refresh_times - harmonogram nocny/weekendowy nie dotyczy
+            elif not _test_mode:
                 if wd < 5 and 1 <= now.hour <= 5:
                     wake_at = now.replace(hour=6, minute=0, second=0, microsecond=0)
                     logger.info("Przerwa nocna (Pon-Pt) – wznowienie o 06:00")
@@ -4848,7 +4882,12 @@ async def main_loop() -> None:
             wd_after = now_after.weekday()
             cykl = "Cykl OK" if login_ok else "Cykl bez danych (logowanie nieudane)"
 
-            if not _test_mode:
+            if REFRESH_TIMES:
+                wake_at = _next_refresh_time(now_after)
+                wait_time = int(max(60, (wake_at - now_after).total_seconds()))
+                logger.info("%s → następne pobieranie o %s (za ~%d min)", cykl, wake_at.strftime("%H:%M"), wait_time // 60)
+
+            elif not _test_mode:
                 if wd_after == 5:
                     next_h = next((h for h in (8, 16, 23) if h > now_after.hour), None)
                     if next_h:

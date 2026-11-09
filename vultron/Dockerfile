@@ -7,7 +7,7 @@ LABEL \
     io.hass.description="TotalnieNIEzaawansowana integracja z EduVulcan.pl (Garn)" \
     io.hass.arch="amd64|aarch64" \
     io.hass.type="addon" \
-    io.hass.version="7.2.2" \
+    io.hass.version="7.3.0" \
     maintainer="htomasz"
 
 ENV PYTHONUNBUFFERED=1

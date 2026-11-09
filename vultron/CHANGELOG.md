@@ -1,4 +1,7 @@
 # 🧩 Changelog
+## **7.3.0 - Garn (fork h3xen)** — 2026-11-09
+- **Opcja `refresh_times`** — lista stałych godzin (`HH:MM`, np. `08:00`, `12:00`), o których dodatek pobiera dane z dziennika. Gdy podana, zastępuje odstęp `refresh_minutes` i przerwy nocne/weekendowe; puste = zachowanie jak dotąd.
+
 ## **7.2.2 - Garn (fork h3xen)** — 2026-11-08
 - **Fork:** wersja z repozytorium [h3xen/vultron](https://github.com/h3xen/vultron), poprawka [@h3xen](https://github.com/h3xen); oryginał: [htomasz/vultron](https://github.com/htomasz/vultron). Zawiera wszystkie zmiany oryginału do 7.2.1 włącznie.
 - **Wiadomości: tylko świeże, z treścią** — sensory `sensor.vultron_wiadomosci_*` i `sensor.vultron_przedszkole_wiadomosci_*` pokazują tylko wiadomości z ostatnich 2 dni (opcja `messages_days`, `0` = jak w oryginale 10 najnowszych). Treść jest także w przeczytanych wiadomościach (do 4000 znaków); jeśli całość nie mieści się w limicie atrybutów HA, najstarsze są pomijane (atrybut `pominiete`). Stan sensora i `stats` nadal liczą wszystkie wiadomości.

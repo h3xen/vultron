@@ -24,6 +24,7 @@ Karty JavaScript dodatek rejestruje w zasobach Lovelace sam, przy każdym starci
 | `test_mode` | Pomija przerwy z harmonogramu (nocne i weekendowe godziny pobierania). Odstęp między pobraniami (`refresh_minutes`) zostaje. Tylko do testów. | `false` |
 | `messages_days` | Sensory wiadomości pokazują tylko wiadomości z tylu ostatnich dni, każdą z treścią. `0` – bez filtra (10 najnowszych). | `2` |
 | `refresh_minutes` | Co ile minut pobierać dane z dziennika (15-1440). Do tej wartości dodawany jest losowy odstęp do połowy jej wartości, np. `40` daje 40-60 min. Nocne i weekendowe przerwy z harmonogramu zostają. Zbyt częste logowania mogą wywołać CAPTCHA lub blokadę konta. | `40` |
+| `refresh_times` | Lista stałych godzin pobierania w formacie `HH:MM`, np. `08:00`, `12:00`. Gdy niepusta, dane są pobierane tylko o tych godzinach (codziennie, także w weekendy); `refresh_minutes`, przerwy nocne i weekendowe oraz `test_mode` nie mają wtedy wpływu na harmonogram. Pierwsze pobranie następuje także zaraz po starcie dodatku. | puste |
 
 ## Kiedy dodatek się zatrzymuje
 

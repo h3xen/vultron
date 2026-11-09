@@ -23,3 +23,6 @@ configuration:
   refresh_minutes:
     name: "Sprawdzanie danych co ile minut"
     description: "Co ile minut pobierać dane z dziennika (do tego czasu dodawany jest losowy odstęp do połowy tej wartości, np. 40 daje 40-60 min). Minimum 15 – zbyt częste logowania mogą wywołać CAPTCHA lub blokadę konta. Nocne i weekendowe przerwy z harmonogramu zostają. Domyślnie: 40."
+  refresh_times:
+    name: "Stałe godziny pobierania (opcjonalnie)"
+    description: "Lista godzin w formacie HH:MM, np. 08:00 i 12:00. Gdy lista nie jest pusta, dodatek pobiera dane z dziennika tylko o tych godzinach (codziennie, także w weekendy) i pomija odstęp 'co ile minut' oraz przerwy nocne/weekendowe. Pierwsze pobranie następuje też zaraz po starcie dodatku. Puste = pobieranie co refresh_minutes."

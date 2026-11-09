@@ -1,7 +1,7 @@
 name: "Vultron (h3xen)"
 description: "Fork h3xen: wiadomości z ostatnich dni z treścią. Oryginał: github.com/htomasz/vultron"
 url: "https://github.com/h3xen/vultron"
-version: "7.2.2"
+version: "7.3.0"
 slug: "vultron"
 panel_icon: "mdi:school"
 homeassistant: ">=2024.12.0"
@@ -20,6 +20,7 @@ options:
   test_mode: false
   messages_days: 2
   refresh_minutes: 40
+  refresh_times: []
 schema:
   provider: list(eduvulcan|gdansk)
   student_name: str?
@@ -29,3 +30,5 @@ schema:
   test_mode: bool
   messages_days: int(0,365)?
   refresh_minutes: int(15,1440)?
+  refresh_times:
+    - match(^([01]?[0-9]|2[0-3]):[0-5][0-9]$)?
